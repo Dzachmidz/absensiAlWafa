@@ -49,3 +49,7 @@ yarn.lock
 # Environment
 .env
 .env.local
+
+# WhatsApp Session (cache besar tidak perlu di-commit)
+Wa-gateaway/sesi_wa/
+Wa-gateaway/.wwebjs_cache/
