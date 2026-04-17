@@ -173,7 +173,7 @@ Sistem ini menggunakan arsitektur **Django MTV (Model-Template-View)** dengan du
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/absensiDigital.git
+   git clone https://github.com/erikaaarn/WEB-ABSENSI-AL-WAFA.git
    cd absensiDigital
    ```
 
@@ -224,5 +224,60 @@ Content-Type: application/json
 ```
 
 Configure your ESP32/Arduino to send `POST` requests to this endpoint when a card is tapped.
+
+---
+
+## 📱 WhatsApp Gateway Integration
+
+Sistem ini terintegrasi dengan WhatsApp Gateway menggunakan **whatsapp-web.js** untuk mengirim notifikasi absensi otomatis ke orang tua/wali siswa.
+
+### Installasi WA Gateway
+
+1. **Masuk ke direktori Wa-gateaway**
+
+   ```bash
+   cd Wa-gateaway
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+3. **Jalankan WA Gateway**
+
+   ```bash
+   node server.js
+   ```
+
+4. **Scan QR Code** - Akan muncul QR Code di terminal, scan dengan akun WhatsApp yang ingin digunakan untuk mengirim notifikasi.
+
+5. **Setelah terhubung** - Akan muncul pesan: `✅ WA GATEWAY AKTIF & TERHUBUNG!`
+
+### Konfigurasi di Django
+
+Pastikan di `settings.py` atau environment variables:
+
+```python
+WA_GATEWAY_URL = "http://localhost:3001/send-message"
+```
+
+### Endpoint API
+
+```
+POST http://localhost:3001/send-message
+Content-Type: application/json
+
+{
+  "number": "081234567890",
+  "message": "Halo, Absensi masuk anak Anda hari ini: HADIR"
+}
+```
+
+> **Catatan:** 
+> - Session WhatsApp tersimpan di `Wa-gateaway/sesi_wa/` (sudah di-gitignore)
+> - Jika QR code tidak muncul, coba jalankan ulang `node server.js`
+> - Jangan spam restart karena bisa menyebabkan QR code baru dan session menjadi invalid
 
 ---
