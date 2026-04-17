@@ -1,0 +1,183 @@
+{% extends 'base_user.html' %} {% load static %} {% block title %}Absensi Digital - Al Wafa{% endblock %} 
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'style.css' %}" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+{% endblock %} 
+
+{% block content %}
+<div class="hidden">{% csrf_token %}</div>
+<div class="bg-animated"></div>
+
+<div class="particles">
+  {% for i in "1234567890" %}<div class="particle"></div>{% endfor %}
+</div>
+
+<div id="main-card" class="attendance-card animate-in">
+  <div id="dynamic-content">
+    <div class="standby-container">
+      <div class="scan-icon-wrapper">
+        <div class="scan-ring"></div>
+        <div class="scan-ring"></div>
+        <div class="scan-ring"></div>
+        <div class="scan-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+          </svg>
+        </div>
+      </div>
+      <h1 class="standby-title">Silakan Tempel Kartu</h1>
+      <p class="standby-subtitle">Tap your card to verify attendance</p>
+    </div>
+    <div class="card-footer">
+      <p>Absensi Digital Al-Wafa • v2.0</p>
+    </div>
+  </div>
+</div>
+
+<div class="debug-bar">
+  <div>
+    <span class="status" id="scan-status">Ready to Scan</span>
+    <span class="ml-1rem">Mode: <strong id="debug-mode">standby</strong></span>
+  </div>
+  <div>
+    <span>Buffer: </span>
+    <span class="buffer" id="input-buffer">—</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+  document.body.classList.add("user-page");
+
+  let keyBuffer = "";
+  let lastKeyTime = Date.now();
+
+  function speak(text) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel(); 
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "id-ID";
+    utterance.pitch = 1.1; 
+    utterance.rate = 0.85; 
+
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(v => (v.lang.includes("id") || v.lang.includes("ID")) && (v.name.toLowerCase().includes("female") || v.name.includes("Indonesian") || v.name.includes("Google")));
+    if (femaleVoice) utterance.voice = femaleVoice;
+
+    utterance.onend = function() {
+      setTimeout(() => { renderStandby(); }, 1000); 
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const currentTime = Date.now();
+    if (currentTime - lastKeyTime > 200) keyBuffer = "";
+    lastKeyTime = currentTime;
+    if (e.key === "Enter") {
+      if (keyBuffer.length > 3) processScan(keyBuffer);
+      keyBuffer = "";
+    } else if (e.key.length === 1) {
+      keyBuffer += e.key;
+    }
+    const bufferDisplay = document.getElementById("input-buffer");
+    if (bufferDisplay) bufferDisplay.innerText = keyBuffer || "—";
+  });
+
+  async function processScan(uid) {
+    updateStatus("Processing...", "warning");
+    try {
+      const response = await axios.post("/api/scan/", { uid: uid }, {
+        headers: { "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value },
+      });
+      renderSuccess(response.data);
+      updateStatus("Scan Success!", "success");
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        renderUnknown(uid);
+        speak("Maaf, kartu belum terdaftar.");
+      } else {
+        updateStatus("Scan Failed", "danger");
+      }
+      setTimeout(renderStandby, 5000); 
+    }
+  }
+
+  function updateStatus(text, type) {
+    const el = document.getElementById("scan-status");
+    if (el) { el.innerText = text; el.className = `status status-text-${type}`; }
+  }
+
+  function renderSuccess(data) {
+    const dynamicContent = document.getElementById("dynamic-content");
+    const now = new Date();
+    const jamStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    
+    const isMasuk = data.mode.toLowerCase() === "masuk";
+    const headerClass = isMasuk ? "header-success" : "header-primary";
+    const statusLabel = isMasuk ? "Hadir" : "Pulang";
+    const avatarIcon = isMasuk ? "👋" : "✨";
+
+    // DI SINI PERBAIKANNYA: Pakai teks manual "HALO!" agar tidak undefined lagi
+    const html = `
+      <div class="card-header ${headerClass}">
+        <div class="status-badge"><span class="dot"></span>${statusLabel}</div>
+        <h1>HALO!</h1>
+      </div>
+      <div class="card-body">
+        <div class="avatar-section">
+          <div class="avatar-icon ${isMasuk ? 'success' : 'primary'}">${avatarIcon}</div>
+        </div>
+        <p class="greeting">HALO!</p>
+        <h2 class="student-name">${data.nama}</h2>
+        <div class="info-grid">
+          <div class="info-box"><span class="label">Kelas</span><span class="value">${data.kelas}</span></div>
+          <div class="info-box"><span class="label">Waktu</span><span class="value time ${isMasuk ? 'success' : 'primary'}">${jamStr}</span></div>
+        </div>
+        <div class="date-info"><p>${now.toLocaleDateString("id-ID", { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+      </div>
+      <div class="card-footer"><p>Absensi Digital Al-Wafa • v2.0</p></div>
+    `;
+
+    dynamicContent.innerHTML = html;
+    
+    const pesanSuara = `Halo, selamat ${data.mode}, ${data.nama}. Kelas ${data.kelas}.`;
+    speak(pesanSuara);
+  }
+
+  function renderUnknown(uid) {
+    document.getElementById("dynamic-content").innerHTML = `
+      <div class="card-header header-danger"><div class="status-badge"><span class="dot"></span>Error</div><h1>Kartu Tidak Dikenal</h1></div>
+      <div class="card-body">
+        <div class="avatar-section"><div class="avatar-icon danger">🚫</div></div>
+        <p class="greeting">Maaf,</p>
+        <h2 class="student-name text-danger">Belum Terdaftar</h2>
+        <div class="unknown-box"><p class="uid-label">UID Kartu</p><p class="uid-value">${uid}</p></div>
+      </div>
+      <div class="card-footer"><p>Absensi Digital Al-Wafa • v2.0</p></div>
+    `;
+  }
+
+  function renderStandby() {
+    document.getElementById("dynamic-content").innerHTML = `
+      <div class="standby-container">
+        <div class="scan-icon-wrapper">
+          <div class="scan-ring"></div><div class="scan-ring"></div><div class="scan-ring"></div>
+          <div class="scan-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+          </div>
+        </div>
+        <h1 class="standby-title">Silakan Tempel Kartu</h1>
+        <p class="standby-subtitle">Tap your card to verify attendance</p>
+      </div>
+      <div class="card-footer"><p>Absensi Digital Al-Wafa • v2.0</p></div>
+    `;
+    document.getElementById("debug-mode").innerText = "standby";
+  }
+</script>
+{% endblock %}

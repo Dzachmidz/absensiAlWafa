@@ -1,0 +1,6 @@
+2026/04/17-08:44:52.009 55d0 Reusing MANIFEST D:\Projek\absensiDigital\Wa-gateaway\sesi_wa\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/04/17-08:44:52.020 55d0 Recovering log #7
+2026/04/17-08:44:52.026 55d0 Reusing old log D:\Projek\absensiDigital\Wa-gateaway\sesi_wa\session\Default\Local Storage\leveldb/000007.log 
+2026/04/17-08:55:00.769 6d3c Level-0 table #11: started
+2026/04/17-08:55:00.779 6d3c Level-0 table #11: 16112 bytes OK
+2026/04/17-08:55:00.783 6d3c Delete type=0 #7

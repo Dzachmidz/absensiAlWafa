@@ -1,0 +1,93 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Dashboard Admin - Absensi Al Wafa{% endblock %} {% block page_title %}Overview{% endblock %} {% block page_subtitle %}Selamat datang kembali, Admin{% endblock %} {% block content %}
+<!-- Stats Cards -->
+<div class="stats-grid">
+  <!-- Total Siswa -->
+  <div class="stat-card primary animate-fade-in-up">
+    <div class="stat-icon">
+      <i class="fas fa-users"></i>
+    </div>
+    <div class="stat-info">
+      <h3>Total Siswa</h3>
+      <p class="value">{{ total_siswa }}</p>
+    </div>
+  </div>
+
+  <!-- Hadir Hari Ini -->
+  <div class="stat-card success animate-fade-in-up animate-delay-1">
+    <div class="stat-icon">
+      <i class="fas fa-check-circle"></i>
+    </div>
+    <div class="stat-info">
+      <h3>Hadir Hari Ini</h3>
+      <p class="value">{{ absen_hari_ini }}</p>
+    </div>
+  </div>
+
+  <!-- Belum Hadir -->
+  <div class="stat-card danger animate-fade-in-up animate-delay-2">
+    <div class="stat-icon">
+      <i class="fas fa-user-clock"></i>
+    </div>
+    <div class="stat-info">
+      <h3>Belum Hadir</h3>
+      <p class="value">{{ belum_hadir }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Card -->
+<div class="admin-card animate-fade-in-up animate-delay-3">
+  <div class="admin-card-header">
+    <h3><i class="fas fa-stream"></i> Aktivitas Terkini</h3>
+    <a
+      href="{% url 'riwayat_absensi' %}"
+      class="btn btn-outline"
+      style="padding: 0.5rem 1rem; font-size: 0.8rem"
+    >
+      Lihat Semua
+    </a>
+  </div>
+  <div class="admin-card-body">
+    {% if recent_activity %}
+    <div class="activity-timeline">
+      {% for activity in recent_activity %}
+      <div class="activity-item">
+        <div
+          class="activity-icon {% if activity.jam_keluar %}pulang{% elif 'Telat' in activity.status_kehadiran %}telat{% else %}masuk{% endif %}"
+        >
+          <i
+            class="fas {% if activity.jam_keluar %}fa-sign-out-alt{% else %}fa-sign-in-alt{% endif %}"
+          ></i>
+        </div>
+        <div class="activity-content">
+          <h4>
+            {{ activity.siswa.nama }}
+            <span class="kelas">({{ activity.siswa.kelas.nama_kelas }})</span>
+          </h4>
+          <p>
+            {% if activity.jam_keluar %}Pulang Sekolah{% else %}Masuk Sekolah{% endif %}
+          </p>
+        </div>
+        <div class="activity-time">
+          <p class="time">{{ activity.created_at|date:"H:i" }}</p>
+          <span
+            class="status {% if 'Telat' in activity.status_kehadiran %}telat{% else %}tepat{% endif %}"
+          >
+            {{ activity.status_kehadiran }}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">
+        <i class="fas fa-inbox"></i>
+      </div>
+      <h4>Belum Ada Aktivitas</h4>
+      <p>Data aktivitas absensi akan muncul di sini</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

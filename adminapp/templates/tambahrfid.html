@@ -1,0 +1,359 @@
+{% extends 'base.html' %} 
+{% load static %} 
+
+{% block title %}Registrasi Kartu Baru - Absensi Al Wafa{% endblock %} 
+
+{% block page_title %}Registrasi Kartu RFID{% endblock %}
+{% block page_subtitle %}Daftarkan kartu RFID ke siswa{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- Kolom Kiri: Form Input -->
+  <div class="lg:col-span-2">
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <h3><i class="fas fa-id-card"></i> Form Registrasi</h3>
+      </div>
+      <div class="admin-card-body">
+        <!-- Tabs / Mode Selection -->
+        <div class="admin-tabs">
+          <button
+            type="button"
+            id="tab-existing"
+            onclick="switchMode('existing')"
+            class="tab-btn active"
+          >
+            <i class="fas fa-users"></i> Pilih Siswa
+          </button>
+          <button
+            type="button"
+            id="tab-new"
+            onclick="switchMode('new')"
+            class="tab-btn"
+          >
+            <i class="fas fa-user-plus"></i> Siswa Baru
+          </button>
+          <button
+            type="button"
+            id="tab-check"
+            onclick="switchMode('check')"
+            class="tab-btn"
+          >
+            <i class="fas fa-search"></i> Cek Kartu
+          </button>
+        </div>
+
+      <form method="POST" action="" class="space-y-6" id="main-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="input-action" value="register">
+
+        <!-- Mode: Cek Kartu -->
+        <div id="form-check" class="hidden">
+            <div class="check-card-info">
+                <div class="check-card-icon">
+                    <i class="fas fa-search-location"></i>
+                </div>
+                <h3>Mode Pengecekan Kartu</h3>
+                <p>Tempelkan kartu pada alat reader, lalu klik tombol <strong>"Cek Kartu"</strong> untuk melihat status kartu dan data pemiliknya.</p>
+                
+                {% if check_result %}
+                <div class="check-result">
+                    {% if check_result.status == 'registered' %}
+                        <div class="result-header success">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Kartu Terdaftar!</span>
+                        </div>
+                        <div class="result-details">
+                            <div class="detail-row">
+                                <span class="label">Nama:</span>
+                                <span class="value">{{ check_result.siswa.nama }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Kelas:</span>
+                                <span class="value">{{ check_result.siswa.kelas.nama_kelas }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">NIS/NIK:</span>
+                                <span class="value font-mono">{{ check_result.siswa.nik }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">No. HP:</span>
+                                <span class="value font-mono">{{ check_result.siswa.no_telepon }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">UID:</span>
+                                <span class="value font-mono">{{ check_result.siswa.rfid_uid }}</span>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="result-header available">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Kartu Tersedia!</span>
+                        </div>
+                        <p class="result-message">Kartu dengan UID <code>{{ check_result.uid }}</code> belum terdaftar di sistem.</p>
+                        <button type="button" onclick="useForRegister('{{ check_result.uid }}')" class="btn btn-primary btn-sm">
+                            <i class="fas fa-arrow-right"></i> Gunakan untuk Registrasi
+                        </button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Mode: Pilih Siswa Existing -->
+        <div id="form-existing" class="block">
+          <div class="form-group">
+            <label class="form-label">Cari Nama Siswa</label>
+            <select
+              name="siswa_id"
+              id="select-siswa"
+              class="form-select"
+            >
+              <option value="">-- Pilih Siswa yang belum punya kartu --</option>
+              {% for s in siswa_tanpa_rfid %}
+              <option
+                value="{{ s.id }}"
+                data-info="{{ s.kelas.nama_kelas }} - {{ s.nik }}"
+              >
+                {{ s.nama }} ({{ s.kelas.nama_kelas }})
+              </option>
+              {% endfor %}
+            </select>
+            <p id="siswa-detail" class="form-hint hidden">
+              Detail: <span id="detail-text" class="font-semibold text-gray-800"></span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Mode: Input Siswa Baru -->
+        <div id="form-new" class="hidden space-y-4">
+          <input type="hidden" name="mode" value="new" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="form-group">
+              <label class="form-label">Nama Lengkap</label>
+              <input
+                type="text"
+                name="nama"
+                class="form-input"
+                placeholder="Contoh: Ahmad Fulan"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">NIK / NIS</label>
+              <input
+                type="text"
+                name="nik"
+                class="form-input"
+                placeholder="Contoh: 12345678"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="form-group">
+              <label class="form-label">Kelas</label>
+              <select name="kelas_id" class="form-select">
+                {% for k in daftar_kelas %}
+                <option value="{{ k.id }}">{{ k.nama_kelas }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">No. Telepon</label>
+              <input
+                type="text"
+                name="no_telepon"
+                class="form-input"
+                placeholder="0812..."
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- RFID Section (Shared) -->
+        <div class="rfid-section">
+          <label class="rfid-label">
+            <i class="fas fa-wifi"></i> RFID Card UID
+          </label>
+          <div class="rfid-input-group">
+            <input
+              type="text"
+              name="rfid_uid"
+              id="rfid_uid"
+              value="{{ suggested_uid|default:'' }}"
+              required
+              class="rfid-input"
+              placeholder="Tempel kartu ke alat..."
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              onclick="window.location.reload();"
+              class="btn btn-secondary"
+              title="Refresh"
+            >
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+          <p class="rfid-hint">
+            <i class="fas fa-info-circle"></i> Pastikan kursor aktif di kolom ini saat scan kartu
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          id="submit-btn"
+          class="btn btn-primary btn-block btn-lg"
+        >
+          <i class="fas fa-save"></i> Simpan Data Kartu
+        </button>
+      </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kolom Kanan: Log -->
+  <div class="lg:col-span-1">
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <h3><i class="fas fa-history"></i> Log Kartu Unknown</h3>
+      </div>
+      <div class="admin-card-body">
+        <div class="unknown-log-list">
+          {% for log in unknown_logs %}
+          <div class="unknown-log-item" onclick="fillUid('{{ log.rfid_uid }}')">
+            <div class="log-icon">
+              <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="log-content">
+              <p class="log-uid">{{ log.rfid_uid }}</p>
+              <p class="log-time">{{ log.waktu_akses|timesince }} yang lalu</p>
+            </div>
+            <div class="log-action">
+              <i class="fas fa-arrow-left"></i>
+            </div>
+          </div>
+          {% empty %}
+          <div class="empty-state small">
+            <div class="empty-state-icon">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <p>Tidak ada log kartu unknown</p>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="log-tips">
+          <h4><i class="fas fa-lightbulb"></i> Petunjuk:</h4>
+          <ul>
+            <li>Scan kartu pada alat RFID</li>
+            <li>Jika UID muncul otomatis, pilih siswa dan Simpan</li>
+            <li>Klik log unknown di atas untuk menyalin UID</li>
+            <li>Gunakan tab <b>Siswa Baru</b> jika data belum ada</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  function switchMode(mode) {
+    const tabs = {
+        existing: document.getElementById("tab-existing"),
+        new: document.getElementById("tab-new"),
+        check: document.getElementById("tab-check")
+    };
+    const forms = {
+        existing: document.getElementById("form-existing"),
+        new: document.getElementById("form-new"),
+        check: document.getElementById("form-check")
+    };
+    const btn = document.getElementById('submit-btn');
+    const inputAction = document.getElementById("input-action");
+
+    // Reset All Tabs
+    for (let key in tabs) {
+        if (tabs[key]) {
+            tabs[key].classList.remove("active");
+        }
+    }
+    for (let key in forms) {
+        if (forms[key]) {
+            forms[key].classList.add("hidden");
+        }
+    }
+
+    // Activate Selected
+    if(tabs[mode]) {
+        tabs[mode].classList.add("active");
+    }
+    if(forms[mode]) {
+        forms[mode].classList.remove("hidden");
+    }
+
+    // Update Action & Button Style
+    if (mode === 'check') {
+        if(inputAction) inputAction.value = 'check';
+        if(btn) {
+            btn.innerHTML = '<i class="fas fa-search"></i> Cek Kartu';
+            btn.className = "btn btn-warning btn-block btn-lg";
+        }
+    } else {
+        if(inputAction) inputAction.value = 'register';
+        if(btn) {
+            btn.innerHTML = '<i class="fas fa-save"></i> Simpan Data Kartu';
+            btn.className = "btn btn-primary btn-block btn-lg";
+        }
+    }
+  }
+
+  function useForRegister(uid) {
+      const inputId = document.getElementById('rfid_uid');
+      if(inputId) inputId.value = uid;
+      switchMode('existing');
+      const select = document.getElementById('select-siswa');
+      if(select) select.focus();
+  }
+
+  function fillUid(uid) {
+    const input = document.getElementById("rfid_uid");
+    if(input) {
+        input.value = uid;
+        input.focus();
+        input.classList.add("success");
+        setTimeout(() => {
+          input.classList.remove("success");
+        }, 500);
+    }
+  }
+
+  // Auto-focus on load
+  window.onload = function () {
+    {% if check_result %}
+        switchMode('check');
+    {% else %}
+        const rfidInput = document.getElementById("rfid_uid");
+        if(rfidInput) rfidInput.focus();
+    {% endif %}
+  };
+
+  // Update detail info saat dropdown berubah
+  const select = document.getElementById("select-siswa");
+  const detailDiv = document.getElementById("siswa-detail");
+  const detailText = document.getElementById("detail-text");
+
+  if(select) {
+      select.addEventListener("change", function () {
+        const option = this.options[this.selectedIndex];
+        const info = option.getAttribute("data-info");
+        if (info) {
+          if(detailText) detailText.innerText = info;
+          if(detailDiv) detailDiv.classList.remove("hidden");
+        } else {
+          if(detailDiv) detailDiv.classList.add("hidden");
+        }
+      });
+  }
+</script>
+{% endblock %}

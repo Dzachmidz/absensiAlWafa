@@ -1,0 +1,102 @@
+<nav
+  class="bg-white shadow-xl w-full md:w-64 flex-shrink-0 md:fixed md:h-full z-10 border-r border-gray-200"
+>
+  <div class="p-6 border-b border-gray-200 bg-gray-50">
+    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+      <i class="fas fa-school mr-3 text-blue-600"></i>
+      AL - WAFA
+    </h1>
+    <p class="text-xs text-gray-500 mt-1 ml-9 font-medium">ADMIN DASHBOARD</p>
+  </div>
+
+  <div class="p-4">
+    <ul class="space-y-2">
+      <!-- Menu Dashboard -->
+      <li>
+        <a
+          href="{% url 'dashboard' %}"
+          class="flex items-center p-3 rounded-lg group {% if request.resolver_match.url_name == 'dashboard' %}text-blue-700 bg-blue-50 font-bold{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium{% endif %}"
+        >
+          <i
+            class="fas fa-home w-6 h-6 mr-2 {% if request.resolver_match.url_name == 'dashboard' %}text-blue-500{% else %}text-gray-400 group-hover:text-blue-500{% endif %}"
+          ></i>
+          <span>Dashboard</span>
+        </a>
+      </li>
+
+      <!-- Menu Data Kelas -->
+      <li>
+        <a
+          href="{% url 'data_kelas' %}"
+          class="flex items-center p-3 rounded-lg group {% if request.resolver_match.url_name == 'data_kelas' %}text-blue-700 bg-blue-50 font-bold{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium{% endif %}"
+        >
+          <i
+            class="fas fa-chalkboard w-6 h-6 mr-2 {% if request.resolver_match.url_name == 'data_kelas' %}text-blue-500{% else %}text-gray-400 group-hover:text-blue-500{% endif %}"
+          ></i>
+          <span>Data Kelas</span>
+        </a>
+      </li>
+
+      <!-- Menu Data Siswa -->
+      <li>
+        <a
+          href="{% url 'data_siswa' %}"
+          class="flex items-center p-3 rounded-lg group {% if request.resolver_match.url_name == 'data_siswa' %}text-blue-700 bg-blue-50 font-bold{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium{% endif %}"
+        >
+          <i
+            class="fas fa-user-graduate w-6 h-6 mr-2 {% if request.resolver_match.url_name == 'data_siswa' %}text-blue-500{% else %}text-gray-400 group-hover:text-blue-500{% endif %}"
+          ></i>
+          <span>Data Siswa</span>
+        </a>
+      </li>
+
+      <!-- Menu History Absensi -->
+      <li>
+        <a
+          href="{% url 'riwayat_absensi' %}"
+          class="flex items-center p-3 rounded-lg group {% if request.resolver_match.url_name == 'riwayat_absensi' %}text-blue-700 bg-blue-50 font-bold{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium{% endif %}"
+        >
+          <i
+            class="fas fa-history w-6 h-6 mr-2 {% if request.resolver_match.url_name == 'riwayat_absensi' %}text-blue-500{% else %}text-gray-400 group-hover:text-blue-500{% endif %}"
+          ></i>
+          <span>Riwayat Absensi</span>
+        </a>
+      </li>
+
+      <!-- Divider -->
+      <li class="border-t border-gray-200 my-4"></li>
+
+      <!-- Menu Registrasi RFID -->
+      <li>
+        <a
+          href="{% url 'registrasi_rfid' %}"
+          class="flex items-center p-3 rounded-lg group {% if request.resolver_match.url_name == 'registrasi_rfid' %}text-green-700 bg-green-50 font-bold{% else %}text-gray-700 hover:bg-green-50 hover:text-green-600 transition-colors font-medium{% endif %}"
+        >
+          <i
+            class="fas fa-id-card w-6 h-6 mr-2 {% if request.resolver_match.url_name == 'registrasi_rfid' %}text-green-500{% else %}text-gray-400 group-hover:text-green-500{% endif %}"
+          ></i>
+          <span>Registrasi RFID</span>
+          {% if request.resolver_match.url_name != 'registrasi_rfid' %}
+          <span
+            class="ml-auto bg-green-100 text-green-800 py-0.5 px-2 rounded-full text-xs font-bold font-mono"
+            >NEW</span
+          >
+          {% endif %}
+        </a>
+      </li>
+
+      <!-- Menu Logout -->
+      <li>
+        <a
+          href="{% url 'logout' %}"
+          class="flex items-center p-3 text-red-600 rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors mt-8 group"
+        >
+          <i
+            class="fas fa-sign-out-alt w-6 h-6 mr-2 text-red-400 group-hover:text-red-600"
+          ></i>
+          <span class="font-medium">Keluar</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>

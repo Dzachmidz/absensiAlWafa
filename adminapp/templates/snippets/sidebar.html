@@ -1,0 +1,94 @@
+<nav class="admin-sidebar">
+  <!-- Sidebar Header / Logo -->
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <i class="fas fa-graduation-cap"></i>
+      </div>
+      <div class="sidebar-logo-text">
+        <h1>AL-WAFA SCHOOL</h1>
+        <p>Admin Dashboard</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="sidebar-nav">
+    <!-- Main Menu -->
+    <div class="sidebar-nav-section">
+      <p class="sidebar-nav-title">Menu Utama</p>
+
+      <a
+        href="{% url 'dashboard' %}"
+        class="sidebar-nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+      >
+        <i class="fas fa-home"></i>
+        <span>Dashboard</span>
+      </a>
+
+      <a
+        href="{% url 'data_kelas' %}"
+        class="sidebar-nav-item {% if request.resolver_match.url_name == 'data_kelas' %}active{% endif %}"
+      >
+        <i class="fas fa-chalkboard"></i>
+        <span>Data Kelas</span>
+      </a>
+
+      <a
+        href="{% url 'data_siswa' %}"
+        class="sidebar-nav-item {% if request.resolver_match.url_name == 'data_siswa' %}active{% endif %}"
+      >
+        <i class="fas fa-user-graduate"></i>
+        <span>Data Siswa</span>
+      </a>
+
+      <a
+        href="{% url 'riwayat_absensi' %}"
+        class="sidebar-nav-item {% if request.resolver_match.url_name == 'riwayat_absensi' %}active{% endif %}"
+      >
+        <i class="fas fa-history"></i>
+        <span>Riwayat Absensi</span>
+      </a>
+    </div>
+
+    <!-- Tools Menu -->
+    <div class="sidebar-nav-section">
+      <p class="sidebar-nav-title">Tools</p>
+
+      <a
+        href="{% url 'absensi_manual' %}"
+        class="sidebar-nav-item {% if request.resolver_match.url_name == 'absensi_manual' %}active{% endif %}"
+      >
+        <i class="fas fa-user-clock"></i>
+        <span>Absensi Manual</span>
+      </a>
+
+      <a
+        href="{% url 'registrasi_rfid' %}"
+        class="sidebar-nav-item {% if request.resolver_match.url_name == 'registrasi_rfid' %}active{% endif %}"
+      >
+        <i class="fas fa-id-card"></i>
+        <span>Registrasi RFID</span>
+        <span class="badge">NEW</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="sidebar-user-avatar">
+        <span>A</span>
+      </div>
+      <div class="sidebar-user-info">
+        <h4>Administrator</h4>
+        <p>Super Admin</p>
+      </div>
+    </div>
+
+    <a href="{% url 'logout' %}" class="sidebar-logout">
+      <i class="fas fa-sign-out-alt"></i>
+      <span>Keluar</span>
+    </a>
+  </div>
+</nav>

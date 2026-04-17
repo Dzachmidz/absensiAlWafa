@@ -1,0 +1,79 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Admin - Absensi Al Wafa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'admin.css' %}">
+  </head>
+  <body class="login-page flex items-center justify-center p-4">
+    
+    <!-- Floating Shapes Background -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-20 left-20 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+      <div class="absolute bottom-20 right-20 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 1s;"></div>
+      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse" style="animation-delay: 2s;"></div>
+    </div>
+
+    <div class="login-card">
+      <!-- Logo Icon -->
+      <div class="login-icon-wrapper">
+        <i class="fas fa-graduation-cap"></i>
+      </div>
+      
+      <!-- Title -->
+      <h1 class="login-title">Selamat Datang</h1>
+      <p class="login-subtitle">Masuk ke Admin Dashboard Al-Wafa</p>
+
+      <!-- Alert Messages -->
+      {% if messages %}
+      <div class="mb-6">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}">
+          <i class="fas {% if message.tags == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Login Form -->
+      <form method="POST" action="">
+        {% csrf_token %}
+        
+        <div class="login-input-group">
+          <label>Username</label>
+          <div class="login-input-wrapper">
+            <input type="text" name="username" required class="login-input" placeholder="Masukkan username" autocomplete="username"/>
+            <i class="fas fa-user"></i>
+          </div>
+        </div>
+
+        <div class="login-input-group">
+          <label>Password</label>
+          <div class="login-input-wrapper">
+            <input type="password" name="password" required class="login-input" placeholder="Masukkan password" autocomplete="current-password"/>
+            <i class="fas fa-lock"></i>
+          </div>
+        </div>
+
+        <button type="submit" class="login-btn">
+          <i class="fas fa-sign-in-alt"></i>
+          <span>Masuk</span>
+        </button>
+      </form>
+
+      <!-- Footer -->
+      <div class="login-footer">
+        <p>&copy; {% now "Y" %} Absensi Digital Al-Wafa</p>
+        <p class="mt-1">All rights reserved</p>
+      </div>
+    </div>
+  </body>
+</html>

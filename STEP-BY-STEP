@@ -1,0 +1,26 @@
+2800710297
+# 📝 Catatan Langkah Menjalankan Ulang (Startup)
+
+# pada VSCODE TERMINAL
+1. Buka XAMPP dan jalankan
+    - Apache
+    - MySQL
+2. Pada terminal vscode ketik
+    .\.venv\Scripts\activate
+    pastikan sudah bisa dan terdapat tulisan (.venv)
+3. ketik
+    python manage.py runserver
+    untuk menjalankan dan membuka web
+
+
+# pada WINDOWS POWERSHELL (biasa)
+1. ketik
+    cd D:\Projek\absensiDigital\Wa-gateaway
+2. ketik
+    node server.js
+
+ # jika terdapat output seperti ini
+(node:13760) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Gateway ready on port 3001
+BIARKAN SAJA SAMPAI KELUAR SEPERTI INI: ✅ GATEWAY AKTIF!

@@ -1,0 +1,166 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Absensi Manual - Admin{% endblock %} 
+{% block extra_head %}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %} 
+{% block page_title %}Absensi Manual{% endblock %} 
+{% block page_subtitle %}Input absensi siswa secara manual{% endblock %} 
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Form Card -->
+    <div class="lg:col-span-2">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h3><i class="fas fa-user-clock"></i> Form Absensi Manual</h3>
+            </div>
+            <div class="admin-card-body">
+                <form method="POST" action="{% url 'absensi_manual' %}" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <!-- Siswa Selection -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-search mr-2 text-indigo-500"></i>Cari & Pilih Siswa
+                        </label>
+                        <select id="siswa-select" name="siswa_id" class="form-select" required>
+                            <option value="">-- Ketik nama siswa untuk mencari --</option>
+                            {% for s in siswas %}
+                            <option value="{{ s.id }}" data-kelas="{{ s.kelas|default:'-' }}" data-nik="{{ s.nik }}">
+                                {{ s.nama }} — {{ s.kelas|default:'Tanpa Kelas' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Info Display Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="info-display-card">
+                            <div class="info-icon">
+                                <i class="fas fa-chalkboard-teacher"></i>
+                            </div>
+                            <div class="info-content">
+                                <p class="info-label">Kelas</p>
+                                <p class="info-value" id="kelas-display">-</p>
+                            </div>
+                        </div>
+                        <div class="info-display-card">
+                            <div class="info-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                <i class="fas fa-id-badge"></i>
+                            </div>
+                            <div class="info-content">
+                                <p class="info-label">NIK/NIS</p>
+                                <p class="info-value" id="nik-display">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Area -->
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
+                        <div class="time-display">
+                            <i class="far fa-clock"></i>
+                            <div>
+                                <p class="time-text">Waktu Server Saat Ini</p>
+                                <p class="time-value" id="live-clock">{% now "H:i:s" %}</p>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn-absen">
+                            <i class="fas fa-check-circle"></i> Proses Absensi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="lg:col-span-1">
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h3><i class="fas fa-info-circle"></i> Petunjuk</h3>
+            </div>
+            <div class="admin-card-body">
+                <div class="space-y-4">
+                    <div class="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                        <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                            <span class="font-bold text-sm">1</span>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-blue-800">Pilih Siswa</p>
+                            <p class="text-sm text-blue-600">Ketik nama untuk mencari siswa</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
+                        <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                            <span class="font-bold text-sm">2</span>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-purple-800">Verifikasi Data</p>
+                            <p class="text-sm text-purple-600">Pastikan kelas dan NIS sudah benar</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                        <div class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                            <span class="font-bold text-sm">3</span>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-green-800">Proses Absensi</p>
+                            <p class="text-sm text-green-600">Sistem otomatis menentukan Masuk/Pulang</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <h4 class="font-bold text-amber-800 flex items-center gap-2 mb-2">
+                        <i class="fas fa-lightbulb"></i> Catatan
+                    </h4>
+                    <ul class="text-sm text-amber-700 space-y-1">
+                        <li>• Jika belum absen hari ini → <strong>Masuk</strong></li>
+                        <li>• Jika sudah masuk & waktunya pulang → <strong>Pulang</strong></li>
+                        <li>• Status Terlambat dihitung otomatis</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Initialize Select2
+        $('#siswa-select').select2({
+            placeholder: "Ketik nama siswa atau kelas...",
+            allowClear: true,
+            width: '100%'
+        });
+
+        // Handle selection change
+        $('#siswa-select').on('select2:select', function (e) {
+            var element = $(e.params.data.element);
+            var kelas = element.attr('data-kelas');
+            var nik = element.attr('data-nik');
+            
+            $('#kelas-display').text(kelas && kelas !== 'None' ? kelas : '-');
+            $('#nik-display').text(nik || '-');
+        });
+        
+        $('#siswa-select').on('select2:clear', function (e) {
+            $('#kelas-display').text('-');
+            $('#nik-display').text('-');
+        });
+
+        // Live Clock
+        function updateClock() {
+            var now = new Date();
+            var hours = String(now.getHours()).padStart(2, '0');
+            var minutes = String(now.getMinutes()).padStart(2, '0');
+            var seconds = String(now.getSeconds()).padStart(2, '0');
+            $('#live-clock').text(hours + ':' + minutes + ':' + seconds);
+        }
+        setInterval(updateClock, 1000);
+    });
+</script>
+{% endblock %}
+

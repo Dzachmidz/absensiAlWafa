@@ -1,0 +1,211 @@
+{% extends 'base.html' %} {% load static %} 
+
+{% block title %}Data Siswa - Absensi Al Wafa{% endblock %} 
+
+{% block page_title %}Manajemen Data Siswa{% endblock %}
+{% block page_subtitle %}Kelola data siswa dan informasi RFID{% endblock %}
+
+{% block content %}
+<!-- Action Buttons -->
+<div class="flex flex-wrap gap-3 mb-6">
+  <button onclick="openModal('modalTambah')" class="btn btn-primary">
+    <i class="fas fa-plus"></i>
+    <span>Tambah Siswa</span>
+  </button>
+  <button onclick="openModal('modalImport')" class="btn btn-success">
+    <i class="fas fa-file-excel"></i>
+    <span>Import Data</span>
+  </button>
+</div>
+
+<!-- Table Card -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h3><i class="fas fa-user-graduate"></i> Daftar Siswa</h3>
+  </div>
+  <div class="admin-card-body">
+    <div class="admin-table-wrapper">
+      <table id="table-siswa" class="admin-table display">
+        <thead>
+          <tr>
+            <th>Nama Siswa</th>
+            <th>NIK/NIS</th>
+            <th>Kelas</th>
+            <th>Status RFID</th>
+            <th class="text-right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in data_siswa %}
+          <tr>
+            <td>
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                  {{ s.nama|slice:":1"|upper }}
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800">{{ s.nama }}</p>
+                  <p class="text-xs text-gray-500">{{ s.no_telepon|default:"-" }}</p>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="font-mono text-sm">{{ s.nik }}</span>
+            </td>
+            <td>
+              {% if s.kelas %}
+              <span class="badge badge-primary">{{ s.kelas.nama_kelas }}</span>
+              {% else %}
+              <span class="badge badge-warning">Belum Diatur</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if s.rfid_uid %}
+              <span class="badge badge-success">
+                <i class="fas fa-check-circle mr-1"></i> {{ s.rfid_uid }}
+              </span>
+              {% else %}
+              <span class="badge badge-danger">
+                <i class="fas fa-times-circle mr-1"></i> Belum Ada
+              </span>
+              {% endif %}
+            </td>
+            <td class="text-right">
+              <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'edit_siswa' s.id %}" class="p-2 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <a href="?delete={{ s.id }}" onclick="return confirm('Hapus siswa {{ s.nama }}?')" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                  <i class="fas fa-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5">
+              <div class="empty-state">
+                <div class="empty-state-icon">
+                  <i class="fas fa-users"></i>
+                </div>
+                <h4>Belum Ada Data Siswa</h4>
+                <p>Klik tombol "Tambah Siswa" untuk menambahkan data</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tambah Siswa -->
+<div id="modalTambah" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'modalTambah')">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-user-plus mr-2 text-indigo-600"></i> Tambah Siswa Baru</h3>
+      <button class="modal-close" onclick="closeModal('modalTambah')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <form method="POST">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nama Lengkap</label>
+          <input type="text" name="nama" required class="form-input" placeholder="Masukkan nama lengkap"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">NIK/NIS</label>
+          <input type="text" name="nik" required class="form-input" placeholder="Masukkan NIK atau NIS"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kelas</label>
+          <select name="kelas_id" required class="form-select">
+            <option value="">-- Pilih Kelas --</option>
+            {% for k in daftar_kelas %}
+            <option value="{{ k.id }}">{{ k.nama_kelas }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">No. Telepon</label>
+          <input type="text" name="no_telepon" class="form-input" placeholder="Contoh: 08123456789"/>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('modalTambah')" class="btn btn-outline">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Import Siswa -->
+<div id="modalImport" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'modalImport')">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-file-excel mr-2 text-green-600"></i> Import Data Siswa</h3>
+      <button class="modal-close" onclick="closeModal('modalImport')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <form method="POST" action="{% url 'import_siswa' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Pilih Kelas Tujuan</label>
+          <select name="kelas_id" required class="form-select">
+            <option value="">-- Pilih Kelas --</option>
+            {% for k in daftar_kelas %}
+            <option value="{{ k.id }}">{{ k.nama_kelas }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Siswa akan dimasukkan ke kelas ini</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">File Excel (.xlsx)</label>
+          <input type="file" name="file_excel" accept=".xlsx" required class="form-input"/>
+          <p class="text-xs text-gray-500 mt-1">Kolom wajib: <strong>Nama Santri</strong></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('modalImport')" class="btn btn-outline">Batal</button>
+        <button type="submit" class="btn btn-success">Import</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Modal Functions
+  function openModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+    document.getElementById(id).classList.add('active');
+  }
+  
+  function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+    document.getElementById(id).classList.remove('active');
+  }
+  
+  function closeModalOnOverlay(event, id) {
+    if (event.target === document.getElementById(id)) {
+      closeModal(id);
+    }
+  }
+
+  // DataTable Init
+  $(document).ready(function() {
+    $('#table-siswa').DataTable({
+      "pageLength": 10,
+      "language": {
+        "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json"
+      }
+    });
+  });
+</script>
+{% endblock %}
