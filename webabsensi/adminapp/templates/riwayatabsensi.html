@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Riwayat & Rekap Absensi - Absensi Al Wafa{% endblock %}
+
+{% block page_title %}Riwayat & Rekap Absensi{% endblock %}
+{% block page_subtitle %}Filter, pantau rekap kehadiran siswa, dan export ke Excel{% endblock %}
+
+{% block content %}
+<!-- Filter & Export Bar -->
+<div class="admin-card mb-6">
+  <div class="admin-card-body">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+      <div>
+        <label class="form-label text-xs">Jenjang</label>
+        <select name="jenjang" onchange="this.form.submit()" class="form-select">
+          <option value="">Semua Jenjang</option>
+          {% for code, label in jenjang_choices %}
+          <option value="{{ code }}" {% if selected_jenjang == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label text-xs">Kelas</label>
+        <select name="kelas_id" onchange="this.form.submit()" class="form-select">
+          <option value="">Semua Kelas</option>
+          {% for k in daftar_kelas %}
+          {% if not selected_jenjang or k.jenjang == selected_jenjang %}
+          <option value="{{ k.id }}" {% if selected_kelas == k.id %}selected{% endif %}>{{ k.nama_kelas }} - {{ k.jenjang }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="form-label text-xs">Dari Tanggal</label>
+        <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" class="form-input" />
+      </div>
+
+      <div>
+        <label class="form-label text-xs">Sampai Tanggal</label>
+        <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" class="form-input" />
+      </div>
+
+      <div>
+        <label class="form-label text-xs">Status</label>
+        <select name="status" onchange="this.form.submit()" class="form-select">
+          <option value="">Semua Status</option>
+          <option value="tepat" {% if selected_status == 'tepat' %}selected{% endif %}>Tepat Waktu</option>
+          <option value="terlambat" {% if selected_status == 'terlambat' %}selected{% endif %}>Terlambat</option>
+        </select>
+      </div>
+
+      <div class="flex gap-2">
+        <button type="submit" name="export" value="excel" class="btn btn-success flex-1">
+          <i class="fas fa-file-excel"></i>
+          <span>Export Rekap</span>
+        </button>
+        {% if selected_jenjang or selected_kelas or start_date or end_date or selected_status %}
+        <a href="{% url 'riwayat_absensi' %}" class="btn btn-outline" title="Reset Filter">
+          <i class="fas fa-undo"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="admin-card p-4 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl">
+      <i class="fas fa-users"></i>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">Total Siswa (Filter)</p>
+      <p class="text-2xl font-bold text-gray-800">{{ total_siswa_filter }}</p>
+    </div>
+  </div>
+  <div class="admin-card p-4 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-xl">
+      <i class="fas fa-calendar-check"></i>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">Total Kehadiran</p>
+      <p class="text-2xl font-bold text-gray-800">{{ total_hadir }}</p>
+    </div>
+  </div>
+  <div class="admin-card p-4 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-xl">
+      <i class="fas fa-check-circle"></i>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">Tepat Waktu</p>
+      <p class="text-2xl font-bold text-green-600">{{ total_tepat }}</p>
+    </div>
+  </div>
+  <div class="admin-card p-4 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-xl">
+      <i class="fas fa-clock"></i>
+    </div>
+    <div>
+      <p class="text-xs text-gray-500">Terlambat</p>
+      <p class="text-2xl font-bold text-red-600">{{ total_terlambat }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- Rekap Per Siswa Card -->
+<div class="admin-card mb-6">
+  <div class="admin-card-header">
+    <h3><i class="fas fa-chart-bar"></i> Rekap Kehadiran Per Siswa</h3>
+  </div>
+  <div class="admin-card-body">
+    <div class="admin-table-wrapper">
+      <table id="table-rekap" class="admin-table display">
+        <thead>
+          <tr>
+            <th>Nama Siswa</th>
+            <th>NIK/NIS</th>
+            <th>Kelas</th>
+            <th>Jenjang</th>
+            <th>Total Hadir</th>
+            <th>Tepat Waktu</th>
+            <th>Terlambat</th>
+            <th>Belum Pulang</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rekap_siswa %}
+          <tr>
+            <td class="font-semibold text-gray-800">{{ r.siswa.nama }}</td>
+            <td><span class="font-mono text-sm">{{ r.siswa.nik }}</span></td>
+            <td><span class="badge badge-primary">{{ r.siswa.kelas.nama_kelas|default:"-" }}</span></td>
+            <td><span class="badge badge-info">{{ r.siswa.kelas.jenjang|default:"-" }}</span></td>
+            <td><span class="font-bold text-gray-800">{{ r.hadir }}</span></td>
+            <td><span class="badge badge-success">{{ r.tepat }}</span></td>
+            <td>
+              {% if r.terlambat > 0 %}
+              <span class="badge badge-danger">{{ r.terlambat }}</span>
+              {% else %}
+              <span class="text-gray-400">0</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.belum_pulang > 0 %}
+              <span class="badge badge-warning">{{ r.belum_pulang }}</span>
+              {% else %}
+              <span class="text-gray-400">0</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Riwayat Absensi Card -->
+<div class="admin-card">
+  <div class="admin-card-header">
+    <h3><i class="fas fa-history"></i> Detail Riwayat Absensi</h3>
+  </div>
+  <div class="admin-card-body">
+    <div class="admin-table-wrapper">
+      <table id="table-absensi" class="admin-table display">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Nama Siswa</th>
+            <th>Kelas</th>
+            <th>Jenjang</th>
+            <th>Jam Masuk</th>
+            <th>Jam Keluar</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for absen in data_absensi %}
+          <tr>
+            <td data-order="{{ absen.tanggal|date:'Y-m-d' }}">
+              <div class="font-semibold text-gray-800">{{ absen.tanggal|date:"d M Y" }}</div>
+              <div class="text-xs text-gray-500">{{ absen.hari }}</div>
+            </td>
+            <td>
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                  {{ absen.siswa.nama|slice:":1"|upper }}
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800">{{ absen.siswa.nama }}</p>
+                  <p class="text-xs text-gray-500">{{ absen.siswa.nik }}</p>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge badge-primary">{{ absen.siswa.kelas.nama_kelas|default:"-" }}</span>
+            </td>
+            <td>
+              <span class="badge badge-info">{{ absen.siswa.kelas.jenjang|default:"-" }}</span>
+            </td>
+            <td>
+              {% if 'Telat' in absen.status_kehadiran or 'Terlambat' in absen.status_kehadiran %}
+              <span class="badge badge-danger">
+                <i class="fas fa-clock mr-1"></i> {{ absen.jam_masuk|time:"H:i" }}
+              </span>
+              {% else %}
+              <span class="badge badge-success">
+                <i class="fas fa-check mr-1"></i> {{ absen.jam_masuk|time:"H:i" }}
+              </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if absen.jam_keluar %}
+              <span class="badge badge-info">
+                <i class="fas fa-sign-out-alt mr-1"></i> {{ absen.jam_keluar|time:"H:i" }}
+              </span>
+              {% else %}
+              <span class="badge badge-warning">
+                <i class="fas fa-hourglass-half mr-1"></i> Belum Pulang
+              </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if 'Telat' in absen.status_kehadiran or 'Terlambat' in absen.status_kehadiran %}
+              <span class="px-3 py-1 inline-flex text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
+                {{ absen.status_kehadiran }}
+              </span>
+              {% else %}
+              <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-700 border border-green-200">
+                {{ absen.status_kehadiran|default:"Tepat Waktu" }}
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  $(document).ready(function() {
+    $('#table-rekap').DataTable({
+      "pageLength": 10,
+      "order": [[ 4, "desc" ]],
+      "language": {
+        "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json"
+      }
+    });
+    $('#table-absensi').DataTable({
+      "pageLength": 15,
+      "order": [[ 0, "desc" ]],
+      "language": {
+        "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json"
+      }
+    });
+  });
+</script>
+{% endblock %}

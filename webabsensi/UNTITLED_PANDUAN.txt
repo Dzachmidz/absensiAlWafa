@@ -1,0 +1,102 @@
+==========================================================
+PANDUAN JENJANG KELAS (LANGKAH-LANGKAH MENAMBAH JENJANG)
+==========================================================
+
+Fitur ini akan menambahkan dropdown "Jenjang" (SD, SMP, SMA) pada model Kelas
+sehingga saat form kelas dibuat, kita tahu itu kelas untuk unit yang mana.
+
+-----------------------------------------------------------
+1. UBAH MODEL (Database)
+-----------------------------------------------------------
+Buka file: userapp/models.py
+Cari class Kelas(models.Model):
+Tambahkan baris berikut di dalamnya (di bawah nama_kelas) :
+
+    JENJANG_CHOICES = [
+        ('SD', 'SD / Setara Paket A'),
+        ('SMP', 'SMP / Setara Paket B'),
+        ('SMA', 'SMA / Setara Paket C'),
+    ]
+    jenjang = models.CharField(max_length=15, choices=JENJANG_CHOICES, default='SMA')
+
+
+-----------------------------------------------------------
+2. MIGRASI DATABASE (Terminal)
+-----------------------------------------------------------
+Setelah menyimpan file models.py, buka Terminal di VSCode.
+Jalankan satu per satu:
+> python manage.py makemigrations userapp
+> python manage.py migrate
+
+
+-----------------------------------------------------------
+3. UBAH FORM HTML (Tampilan Admin)
+-----------------------------------------------------------
+Buka file: adminapp/templates/datakelas.html
+Cari komentar "<!-- Form Card -->" lalu "nama_kelas".
+Tambahkan kotak dropdown ini TEPAT di bawah <div class="form-group"> milik nama_kelas:
+
+    <div class="form-group mt-3">
+       <label class="form-label">Jenjang</label>
+       <select name="jenjang" id="jenjang" required class="form-select">
+          <option value="SD">SD / Setara Paket A</option>
+          <option value="SMP">SMP / Setara Paket B</option>
+          <option value="SMA">SMA / Setara Paket C</option>
+       </select>
+    </div>
+
+
+-----------------------------------------------------------
+4. TAMPILKAN LOGIKANYA DI VIEWS (Proses Simpan)
+-----------------------------------------------------------
+Buka file: adminapp/views.py
+Cari baris: def data_kelas_view(request):
+Scroll ke bawah sampai ketemu tempat mengambil data form:
+    nama_kelas = request.POST.get('nama_kelas')
+    
+Tambahkan tangkapan baru:
+    jenjang = request.POST.get('jenjang')
+    
+Lalu pada saat Create:
+    Kelas.objects.create(nama_kelas=nama_kelas, jenjang=jenjang, ...)
+    
+Lalu pada saat Update (di dalam if id_kelas:):
+    kelas_obj.nama_kelas = nama_kelas
+    kelas_obj.jenjang = jenjang   <-- Tambahkan ini
+    kelas_obj.jadwal_masuk_mulai = ...
+
+
+-----------------------------------------------------------
+5. TAMPILKAN DI TABEL (Tampilan List)
+-----------------------------------------------------------
+Kembali buka: adminapp/templates/datakelas.html
+Cari tulisan "<!-- Table Card -->"
+Di bagian <thead>, tambahkan nama kolom baru "<th>Jenjang</th>" di sebelah Nama Kelas.
+
+Di bagian <tbody>, tambahkan kolom datanya di bawah <td>{{ item.nama_kelas }}</td>:
+    <td>
+       <span class="badge badge-info">{{ item.jenjang }}</span>
+    </td>
+
+
+-----------------------------------------------------------
+6. PERBAIKI FUNGSI JAVASCRIPT EDIT (Penting)
+-----------------------------------------------------------
+Scroll sampai baris Paling Bawah di datakelas.html.
+Cari fungsi: function editKelas(id, nama, jmm, jma, jpm, jpa)
+
+Langkah A. Tambahkan parameter "jenjang" setelah nama:
+    function editKelas(id, nama, jenjang, jmm, jma, jpm, jpa) {
+
+Langkah B. Tangkap valuenya dari parameter ke dropdown form:
+    document.getElementById("jenjang").value = jenjang;
+
+Langkah C. Cari tombol edit kuning di dalam Table Card (bagian atas file):
+    <button onclick="editKelas('{{ item.id }}', '{{ item.nama_kelas }}', ...)"
+
+Sisipkan variabel jenjang ke dalam kurungnya:
+    onclick="editKelas('{{ item.id }}', '{{ item.nama_kelas }}', '{{ item.jenjang }}', '{{ item.jadwal_masuk_mulai|time:'H:i' }}', ...)"
+
+==========================================================
+SELESAI! Silakan jalankan langkah 1-6 dengan pelan-pelan.
+==========================================================

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cetak ID Card Massal</title>
+
+    <!-- Pake LINK agar proses load font lebih stabil saat diprint -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+P+One&display=swap" rel="stylesheet">
+
+    <style>
+        /* Reset bawaan untuk printing yang bersih */
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex; /* Ganti kembali ke block layout agar break-inside bisa bekerja maksimal */
+            flex-direction: row; 
+            flex-wrap: wrap; 
+            justify-content: center;
+            align-items: flex-start;
+            background-color: #555;
+            font-family: 'Arial', sans-serif;
+            gap: 20px; /* Jarak antar set kartu saat preview di browser */
+        }
+
+        /* Ukuran standar Box ID Card */
+        .id-card-wrapper {
+            position: relative;
+            width: 54mm; 
+            height: 85mm; 
+            background-color: #fff;
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            border-radius: 3mm;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* FOTO SISWA */
+        .foto-siswa {
+            position: absolute;
+            top: 33.1%;
+            left: 22.7%;
+            width: 29.3mm;
+            height: 32.7mm;
+            border-radius: 3mm;
+            object-fit: cover;
+            object-position: bottom center;
+            z-index: 1;
+        }
+
+        /* FOTO SISWA KHUSUS JENJANG KB & TK */
+        .foto-kb-tk {
+            top: 37%;
+            left: 22.7%;
+            width: 29.3mm;
+            height: 29.4mm;
+        }
+
+        /* FOTO SISWA KHUSUS JENJANG TPQ & MADIN */
+        .foto-tpq-madin {
+            top: 34%;
+            left: 29.7%;
+            width: 29mm;
+            height: 32.5mm;
+        }
+
+        /* TULISAN NAMA (DEFAULT: 1 BARIS / PENDEK) */
+        .nama-siswa {
+            position: absolute;
+            top: 75.8%;
+            left: 0%;
+            width: 100%;
+            text-align: center;
+            font-family: 'Mochiy Pop P One', sans-serif;
+            font-size: 8pt;
+            font-weight: 800;
+            color: #facf5a;
+            text-transform: uppercase;
+            padding: 0 5mm;
+            box-sizing: border-box;
+            line-height: 1.1;
+            z-index: 2;
+        }
+
+        /* TULISAN NAMA (KHUSUS NAMA PANJANG / 2 BARIS) */
+        .nama-siswa.nama-panjang {
+            top: 74.5%;
+            font-size: 7.5pt;
+            padding: 0 8mm;
+            line-height: 1.2;
+            word-wrap: break-word;
+            white-space: normal;
+        }
+
+        /* TULISAN NAMA (SANGAT PANJANG / 3 BARIS) */
+        .nama-siswa.nama-super-panjang {
+            top: 72.5%;
+            font-size: 7.5pt;
+            padding: 0 9mm;
+            line-height: 1.2;
+            word-wrap: break-word;
+            white-space: normal;
+        }
+
+        /* TULISAN KELAS / AL-PHARABIUS */
+        .kelas-siswa {
+            position: absolute;
+            top: 85%;
+            left: 0%;
+            width: 100%;
+            text-align: center;
+            font-family: 'Mochiy Pop P One', sans-serif;
+            font-size: 6pt;
+            font-weight: bold;
+            color: #facf5a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 2;
+        }
+
+        /* NAMA KHUSUS JENJANG TPQ & MADIN */
+        .nama-tpq-madin {
+            top: 76%; /* Silakan edit posisi nama atas untuk TPQ & MADIN */
+            left: 7%; /* Silakan edit posisi left nama untuk TPQ & MADIN */
+        }
+        .nama-tpq-madin.nama-panjang {
+            top: 74.5%; /* Silakan edit cover baris 2 */
+            left: 7%; /* Silakan edit posisi left nama untuk TPQ & MADIN */
+        }
+        .nama-tpq-madin.nama-super-panjang {
+            top: 75%; /* Silakan edit cover baris 3 */
+            left: 7%; /* Silakan edit posisi left nama untuk TPQ & MADIN */
+        }
+
+        /* KELAS KHUSUS JENJANG TPQ & MADIN */
+        .kelas-tpq-madin {
+            top: 83.5%; /* Silakan edit posisi kelas untuk TPQ & MADIN */
+            left: 7%; /* Silakan edit posisi left kelas untuk TPQ & MADIN */
+        }
+
+        /* CONTAINER UNTUK MENJAJEJARKAN DEPAN & BELAKANG */
+        .kartu-container {
+            display: inline-flex; /* Menggunakan inline-flex agar kartu tidak memanjang penuh */
+            gap: 5mm;
+            align-items: center;
+            justify-content: center;
+            page-break-inside: avoid; /* Memastikan kartu tidak terpotong di halaman print */
+            break-inside: avoid;     /* Properti modern untuk mencegah kepotong */
+            margin-bottom: 5mm;      /* Jarak bawah setiap set ID card */
+        }
+
+        /* KARTU BAGIAN BELAKANG */
+        .id-card-back {
+            position: relative;
+            width: 54mm;
+            height: 85mm;
+            background-color: #fff;
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            border-radius: 3mm;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        @media print {
+            @page {
+                /* Kami hilangkan batasan ukuran 120x95 karena sekarang bisa memakai layout A4 bebas */
+                margin: 5mm; 
+            }
+            body {
+                background-color: #fff;
+                padding: 0;
+                gap: 5mm; /* Tetap beri sedikit jarak antar kartu di saat cetak PDF (A4) */
+            }
+            .id-card-wrapper, .id-card-back {
+                box-shadow: none !important; 
+                border-radius: 0 !important;
+            }
+        }
+
+        /* Menampilkan tombol "Print Semua" di mode browser, disembunyikan saat di print */
+        .print-btn-float {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            text-decoration: none;
+            z-index: 1000;
+        }
+        .print-btn-float:hover {
+            background-color: #45a049;
+        }
+        @media print {
+            .print-btn-float {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% load static %}
+    
+    <a href="javascript:window.print()" class="print-btn-float">🖨️ Cetak ke PDF</a>
+
+    {% for siswa in siswa_list %}
+    <!-- PEMBUNGKUS KEDUA KARTU (DEPAN & BELAKANG) -->
+    <div class="kartu-container">
+
+        <!-- KARTU BAGIAN DEPAN -->
+        <div class="id-card-wrapper" style="background-image: url('{% if siswa.kelas %}{% if siswa.kelas.jenjang == 'KB' %}{% static 'bg_kb.png' %}{% elif siswa.kelas.jenjang == 'TK' %}{% static 'bg_tk.png' %}{% elif siswa.kelas.jenjang == 'PKBM' %}{% static 'bg_pkbm.png' %}{% elif siswa.kelas.jenjang == 'TPQ' %}{% static 'bg_tpq.png' %}{% elif siswa.kelas.jenjang == 'MADIN' %}{% static 'bg_madin.png' %}{% else %}{% static 'bg_pkbm.png' %}{% endif %}{% else %}{% static 'bg_pkbm.png' %}{% endif %}') !important;">
+            
+            <!-- FOTO -->
+            {% if siswa.foto %}
+                <img src="{{ siswa.foto.url }}" alt="Foto Siswa" class="foto-siswa {% if siswa.kelas and siswa.kelas.jenjang in 'KB,TK' %}foto-kb-tk{% elif siswa.kelas and siswa.kelas.jenjang in 'TPQ,MADIN' %}foto-tpq-madin{% endif %}">
+            {% else %}
+                <div class="foto-siswa {% if siswa.kelas and siswa.kelas.jenjang in 'KB,TK' %}foto-kb-tk{% elif siswa.kelas and siswa.kelas.jenjang in 'TPQ,MADIN' %}foto-tpq-madin{% endif %}" style="background-color: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; color: #333; font-weight: bold;">
+                    Belum Upload Foto
+                </div>
+            {% endif %}
+            
+            <!-- NAMA -->
+            <div class="nama-siswa {% if siswa.nama|length >= 30 %}nama-super-panjang{% elif siswa.nama|length >= 20 %}nama-panjang{% endif %} {% if siswa.kelas and siswa.kelas.jenjang in 'TPQ,MADIN' %}nama-tpq-madin{% endif %}">
+                {{ siswa.nama }}
+            </div>
+            
+            <!-- KELAS -->
+            <div class="kelas-siswa {% if siswa.kelas and siswa.kelas.jenjang in 'TPQ,MADIN' %}kelas-tpq-madin{% endif %}">
+                {% if siswa.kelas %}
+                    {{ siswa.kelas.nama_kelas }}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+
+        </div> <!-- Tutup id-card-wrapper (Kartu Depan) -->
+
+        <!-- KARTU BAGIAN BELAKANG -->
+        <div class="id-card-back" style="background-image: url('{% if siswa.kelas %}{% if siswa.kelas.jenjang == 'KB' %}{% static 'bg_kb_back.png' %}{% elif siswa.kelas.jenjang == 'TK' %}{% static 'bg_tk_back.png' %}{% elif siswa.kelas.jenjang == 'PKBM' %}{% static 'bg_pkbm_back.png' %}{% elif siswa.kelas.jenjang == 'TPQ' %}{% static 'bg_tpq_back.png' %}{% elif siswa.kelas.jenjang == 'MADIN' %}{% static 'bg_madin_back.png' %}{% else %}{% static 'bg_pkbm_back.png' %}{% endif %}{% else %}{% static 'bg_pkbm_back.png' %}{% endif %}') !important;">
+        </div>
+
+    </div> <!-- Tutup kartu-container -->
+    {% endfor %}
+
+</body>
+</html>
