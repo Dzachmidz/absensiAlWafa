@@ -168,12 +168,19 @@
         </div>
         <div class="form-group">
           <label class="form-label">Foto</label>
-          <input type="file" name="foto" accept="image/*" class="form-input"/>
+          <input type="file" id="foto-input-tambah" accept="image/*" class="form-input"/>
+          <input type="file" name="foto" id="foto-real-tambah" class="hidden"/>
+          <div id="foto-status-tambah" class="text-xs text-indigo-600 mt-1 hidden font-medium flex items-center gap-1">
+            <i class="fas fa-spinner fa-spin"></i> <span>Menghapus background foto...</span>
+          </div>
+          <div id="foto-preview-tambah" class="mt-2 hidden">
+            <img class="w-24 h-24 object-contain rounded border border-gray-200 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:8px_8px]" />
+          </div>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" onclick="closeModal('modalTambah')" class="btn btn-outline">Batal</button>
-        <button type="submit" class="btn btn-primary">Simpan</button>
+        <button type="submit" id="btn-submit-tambah" class="btn btn-primary">Simpan</button>
       </div>
     </form>
   </div>
@@ -246,5 +253,61 @@
       }
     });
   });
+
+  // Client-Side AI Background Removal (Imgly)
+  async function setupRembg(pickerId, realInputId, statusId, previewId, submitBtnId) {
+    const picker = document.getElementById(pickerId);
+    const realInput = document.getElementById(realInputId);
+    const statusEl = document.getElementById(statusId);
+    const previewContainer = document.getElementById(previewId);
+    const previewImg = previewContainer ? previewContainer.querySelector('img') : null;
+    const submitBtn = submitBtnId ? document.getElementById(submitBtnId) : null;
+
+    if (!picker) return;
+
+    picker.addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (statusEl) statusEl.classList.remove('hidden');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
+      try {
+        const { removeBackground } = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
+        const blob = await removeBackground(file);
+        
+        const transparentFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".png", { type: "image/png" });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(transparentFile);
+        realInput.files = dataTransfer.files;
+
+        if (previewImg) {
+          previewImg.src = URL.createObjectURL(blob);
+          previewContainer.classList.remove('hidden');
+        }
+        if (statusEl) {
+          statusEl.innerHTML = '<i class="fas fa-check-circle text-green-600"></i> <span class="text-green-600">Background berhasil dihapus!</span>';
+        }
+      } catch (err) {
+        console.warn('Gagal menghapus background di browser, menggunakan file asli:', err);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        realInput.files = dataTransfer.files;
+        if (statusEl) {
+          statusEl.innerHTML = '<span class="text-gray-500">Foto asli siap diupload</span>';
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+      }
+    });
+  }
+
+  setupRembg('foto-input-tambah', 'foto-real-tambah', 'foto-status-tambah', 'foto-preview-tambah', 'btn-submit-tambah');
 </script>
 {% endblock %}
