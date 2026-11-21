@@ -100,15 +100,8 @@ if os.environ.get('DATABASE_URL'):
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': 'absensialwafa',
-            'USER': 'root',
-            'PASSWORD': '',
-            'HOST': '127.0.0.1',
-            'PORT': '3306',
-            'OPTIONS': {
-                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            },
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
