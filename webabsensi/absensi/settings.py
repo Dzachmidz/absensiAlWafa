@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from urllib.parse import urlparse
 import os
 import dj_database_url
 from dotenv import load_dotenv
@@ -143,11 +144,57 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media Files (Uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# ---------- Storage ----------
+# Vercel filesystem read-only -> media wajib ke object storage.
+# Kalau env Supabase tidak ada (dev lokal), fallback ke disk biasa.
+
+
+def _supabase_url_from_database_url(database_url):
+    """Turunkan https://<ref>.supabase.co dari DATABASE_URL Supabase.
+
+    Format pooler: postgresql://postgres.<ref>:pass@aws-0-<region>.pooler.supabase.com:6543/postgres
+    """
+    if not database_url:
+        return ''
+    try:
+        parsed = urlparse(database_url)
+        user = parsed.username or ''
+        ref = user.split('.', 1)[1] if user.startswith('postgres.') else ''
+        if ref:
+            return f'https://{ref}.supabase.co'
+        host = parsed.hostname or ''
+        if host.endswith('.supabase.co'):
+            return f'https://{host}'
+    except ValueError:
+        pass
+    return ''
+
+
+SUPABASE_URL = (
+    os.environ.get('SUPABASE_URL', '').rstrip('/')
+    or _supabase_url_from_database_url(os.environ.get('DATABASE_URL', ''))
+)
+SUPABASE_SERVICE_KEY = os.environ.get(
+    'SUPABASE_SERVICE_KEY', os.environ.get('SUPABASE_KEY', ''))
+SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'foto-siswa')
+
+_STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    STORAGES = {
+        'default': {'BACKEND': 'absensi.storage.SupabaseStorage'},
+        'staticfiles': {'BACKEND': _STATICFILES_STORAGE},
+    }
+else:
+    STORAGES = {
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': _STATICFILES_STORAGE},
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

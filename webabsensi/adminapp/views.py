@@ -363,6 +363,12 @@ def data_siswa_view(request):
                 )
                 messages.success(
                     request, f"Berhasil menambahkan siswa: {nama}")
+        except OSError as e:
+            messages.error(
+                request,
+                f"Gagal menyimpan foto: penyimpanan media tidak bisa ditulis ({e}). "
+                "Set env SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_BUCKET di server."
+            )
         except Exception as e:
             messages.error(request, f"Gagal menyimpan: {str(e)}")
         return redirect('data_siswa')
@@ -641,6 +647,12 @@ def edit_siswa_view(request, id):
                 messages.success(
                     request, f"Data siswa {nama} berhasil diperbarui.")
                 return redirect('data_siswa')
+        except OSError as e:
+            messages.error(
+                request,
+                f"Gagal menyimpan foto: penyimpanan media tidak bisa ditulis ({e}). "
+                "Set env SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_BUCKET di server."
+            )
         except Exception as e:
             messages.error(request, f"Gagal update: {e}")
 
