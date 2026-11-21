@@ -19,27 +19,32 @@ def process_student_photo(image_field, size=600, top_pad=0.04):
         nobg = img
 
     # Cek apakah gambar memiliki transparansi
-    alpha = nobg.split()[-1]
+    r, g, b, alpha = nobg.split()
     has_transparency = alpha.getextrema() != (255, 255)
 
     if has_transparency:
+        # Bersihkan noise pixel semi-transparan tipis (alpha <= 20) yang dihasilkan tools remove bg luar
+        clean_alpha = alpha.point(lambda p: p if p > 20 else 0)
+        nobg.putalpha(clean_alpha)
+
+        # Ambil batas sesungguhnya dari subjek
         bbox = nobg.getbbox()
         if bbox:
             nobg = nobg.crop(bbox)
         w, h = nobg.size
-        # Zoom subjek agar proporsional di ID Card (isi ~92% tinggi dan max 96% lebar)
-        target_h = int(size * 0.92)
+
+        # Zoom subjek agar pas & proporsional memenuhi frame ID Card
+        target_h = int(size * 0.94)
         scale_by_h = target_h / h
-        # Jika setelah di-scale tingginya, lebarnya melebihi kanvas, scale berdasarkan lebar
         if int(w * scale_by_h) > int(size * 0.96):
             scale = (size * 0.96) / w
         else:
             scale = scale_by_h
-            
+
         nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
         resized = nobg.resize((nw, nh), Image.Resampling.LANCZOS)
         canvas = Image.new("RGBA", (size, size), (255, 255, 255, 0))
-        # Tempel pas menempel di bagian bawah (y = size - nh), rata tengah horizontal
+        # Tempel pas di dasar bingkai (y = size - nh), rata tengah secara horizontal
         canvas.paste(resized, ((size - nw) // 2, size - nh), resized)
     else:
         # Foto biasa (tanpa hapus background): center-crop persegi proporsional
