@@ -170,10 +170,20 @@
           <label class="form-label">Foto</label>
           <input type="file" id="foto-input-tambah" accept="image/*" class="form-input"/>
           <input type="file" name="foto" id="foto-real-tambah" class="hidden"/>
-          <div id="foto-status-tambah" class="text-xs text-indigo-600 mt-1 hidden font-medium flex items-center gap-1">
+
+          <!-- Opsi Hapus Background Checkbox -->
+          <div class="mt-2 flex items-center gap-2">
+            <input type="checkbox" id="foto-rembg-toggle-tambah" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer">
+            <label for="foto-rembg-toggle-tambah" class="text-xs font-medium text-gray-700 cursor-pointer select-none">
+              Otomatis hapus background foto (transparan)
+            </label>
+          </div>
+
+          <div id="foto-status-tambah" class="text-xs text-indigo-600 mt-1.5 hidden font-medium flex items-center gap-1">
             <i class="fas fa-spinner fa-spin"></i> <span>Menghapus background foto...</span>
           </div>
           <div id="foto-preview-tambah" class="mt-2 hidden">
+            <p class="text-xs text-gray-500 mb-1">Preview Foto:</p>
             <img class="w-24 h-24 object-contain rounded border border-gray-200 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:8px_8px]" />
           </div>
         </div>
@@ -254,33 +264,49 @@
     });
   });
 
-  // Client-Side AI Background Removal (Imgly)
-  async function setupRembg(pickerId, realInputId, statusId, previewId, submitBtnId) {
+  // Client-Side Photo Processing (With optional rembg & auto-compress to avoid 413)
+  function setupRembg(pickerId, realInputId, statusId, previewId, submitBtnId, toggleId) {
     const picker = document.getElementById(pickerId);
     const realInput = document.getElementById(realInputId);
     const statusEl = document.getElementById(statusId);
     const previewContainer = document.getElementById(previewId);
     const previewImg = previewContainer ? previewContainer.querySelector('img') : null;
     const submitBtn = submitBtnId ? document.getElementById(submitBtnId) : null;
+    const toggle = toggleId ? document.getElementById(toggleId) : null;
 
     if (!picker) return;
 
-    picker.addEventListener('change', async function(e) {
-      const file = e.target.files[0];
+    async function processSelectedFile() {
+      const file = picker.files[0];
       if (!file) return;
 
-      if (statusEl) statusEl.classList.remove('hidden');
+      const wantRembg = toggle ? toggle.checked : false;
+
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
       }
 
+      if (wantRembg) {
+        if (statusEl) {
+          statusEl.classList.remove('hidden');
+          statusEl.innerHTML = '<i class="fas fa-spinner fa-spin text-indigo-600"></i> <span class="text-indigo-600">Menghapus background foto...</span>';
+        }
+      }
+
       try {
-        const { removeBackground } = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
-        const rawBlob = await removeBackground(file);
-        
-        // Kompres & resize ke max 800px agar payload kecil (< 1MB), aman dari limit 4.5MB Vercel
-        const compressedBlob = await new Promise((resolve) => {
+        let processedBlob;
+
+        if (wantRembg) {
+          const { removeBackground } = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
+          const rawBlob = await removeBackground(file);
+          processedBlob = rawBlob;
+        } else {
+          processedBlob = file;
+        }
+
+        // Kompres / resize gambar (max 800px) agar payload selalu kecil (< 1MB), aman dari limit 413 Vercel
+        const finalBlob = await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
             const maxDim = 800;
@@ -300,30 +326,37 @@
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            canvas.toBlob((b) => resolve(b || rawBlob), 'image/png');
+            canvas.toBlob((b) => resolve(b || processedBlob), wantRembg ? 'image/png' : (file.type || 'image/jpeg'), 0.85);
           };
-          img.src = URL.createObjectURL(rawBlob);
+          img.src = URL.createObjectURL(processedBlob);
         });
 
-        const transparentFile = new File([compressedBlob], file.name.replace(/\.[^/.]+$/, "") + ".png", { type: "image/png" });
+        const ext = wantRembg ? '.png' : (file.name.substring(file.name.lastIndexOf('.')) || '.jpg');
+        const finalFile = new File([finalBlob], file.name.replace(/\.[^/.]+$/, "") + ext, { type: finalBlob.type });
         const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(transparentFile);
+        dataTransfer.items.add(finalFile);
         realInput.files = dataTransfer.files;
 
         if (previewImg) {
-          previewImg.src = URL.createObjectURL(compressedBlob);
+          previewImg.src = URL.createObjectURL(finalBlob);
           previewContainer.classList.remove('hidden');
         }
+
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-check-circle text-green-600"></i> <span class="text-green-600">Background berhasil dihapus!</span>';
+          if (wantRembg) {
+            statusEl.innerHTML = '<i class="fas fa-check-circle text-green-600"></i> <span class="text-green-600">Background berhasil dihapus!</span>';
+          } else {
+            statusEl.innerHTML = '<i class="fas fa-check-circle text-green-600"></i> <span class="text-green-600">Foto siap diupload (tanpa hapus background).</span>';
+            statusEl.classList.remove('hidden');
+          }
         }
       } catch (err) {
-        console.warn('Gagal menghapus background di browser, menggunakan file asli:', err);
+        console.warn('Gagal memproses gambar:', err);
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(file);
         realInput.files = dataTransfer.files;
         if (statusEl) {
-          statusEl.innerHTML = '<span class="text-gray-500">Foto asli siap diupload</span>';
+          statusEl.innerHTML = '<span class="text-gray-500">Menggunakan file asli</span>';
         }
       } finally {
         if (submitBtn) {
@@ -331,9 +364,16 @@
           submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
       }
-    });
+    }
+
+    picker.addEventListener('change', processSelectedFile);
+    if (toggle) {
+      toggle.addEventListener('change', () => {
+        if (picker.files.length > 0) processSelectedFile();
+      });
+    }
   }
 
-  setupRembg('foto-input-tambah', 'foto-real-tambah', 'foto-status-tambah', 'foto-preview-tambah', 'btn-submit-tambah');
+  setupRembg('foto-input-tambah', 'foto-real-tambah', 'foto-status-tambah', 'foto-preview-tambah', 'btn-submit-tambah', 'foto-rembg-toggle-tambah');
 </script>
 {% endblock %}

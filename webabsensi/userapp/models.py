@@ -18,21 +18,36 @@ def process_student_photo(image_field, size=600, top_pad=0.06):
         nobg = remove(img)
     else:
         nobg = img
-    bbox = nobg.getbbox()
-    if bbox:
-        nobg = nobg.crop(bbox)
-    w, h = nobg.size
-    # If portrait / upper-body shot, crop to chest/shoulder level so subject zooms in bigger
-    max_h = int(w * 1.15)
-    if h > max_h:
-        nobg = nobg.crop((0, 0, w, max_h))
+
+    # Cek apakah gambar memiliki transparansi (alpha channel tidak semuanya 255)
+    # Jika gambar memiliki transparansi (karena rembg), lakukan crop ke subjek transparan (bbox)
+    alpha = nobg.split()[-1]
+    has_transparency = alpha.getextrema() != (255, 255)
+
+    if has_transparency:
+        bbox = nobg.getbbox()
+        if bbox:
+            nobg = nobg.crop(bbox)
         w, h = nobg.size
-    scale = min(size / w, (size * (1 - top_pad)) / h)
-    nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
-    resized = nobg.resize((nw, nh), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGBA", (size, size), (255, 255, 255, 0))
-    # Flush to bottom edge (y = size - nh), centered horizontally
-    canvas.paste(resized, ((size - nw) // 2, size - nh), resized)
+        # Crop bagian bawah dada/pundak jika terlalu panjang
+        max_h = int(w * 1.15)
+        if h > max_h:
+            nobg = nobg.crop((0, 0, w, max_h))
+            w, h = nobg.size
+        scale = min(size / w, (size * (1 - top_pad)) / h)
+        nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+        resized = nobg.resize((nw, nh), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+        canvas.paste(resized, ((size - nw) // 2, size - nh), resized)
+    else:
+        # Foto biasa (tanpa hapus background): center-crop persegi proporsional
+        w, h = nobg.size
+        min_dim = min(w, h)
+        left = (w - min_dim) // 2
+        top = (h - min_dim) // 2
+        cropped = nobg.crop((left, top, left + min_dim, top + min_dim))
+        canvas = cropped.resize((size, size), Image.Resampling.LANCZOS)
+
     buf = io.BytesIO()
     canvas.save(buf, format="PNG")
     return ContentFile(buf.getvalue())
