@@ -31,9 +31,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-g^9_7ff&m*s%wjocwtk*b
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = ['*', 'factsheet-properly-freeway.ngrok-free.dev', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['*', '.vercel.app', 'localhost', '127.0.0.1']
 
 CSRF_TRUSTED_ORIGINS = [
+    'https://*.vercel.app',
     'https://factsheet-properly-freeway.ngrok-free.dev',
 ]
 
