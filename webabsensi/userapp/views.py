@@ -67,7 +67,6 @@ class RfidScanView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 def rfid_feedback_view(request):
-    try:
-        return render(request, 'user.html')
-    except:
-        return render(request, 'rfid_feedback.html')
+    # Tampilan layar RFID. Jangan pakai bare except: dulu error asli tertutup
+    # dan jatuh ke template yang tidak ada (rfid_feedback.html).
+    return render(request, 'user.html')

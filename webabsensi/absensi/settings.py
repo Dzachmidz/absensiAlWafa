@@ -149,9 +149,15 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# ---------- Storage ----------
-# Vercel filesystem read-only -> media wajib ke object storage.
-# Kalau env Supabase tidak ada (dev lokal), fallback ke disk biasa.
+# ---------- Static & Storage ----------
+# Static pakai storage tanpa manifest hashing: kalau collectstatic belum
+# dijalankan (Vercel), `{% static %}` tetap jalan dan tidak melempar
+# "Missing staticfiles manifest entry".
+_STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Kalau staticfiles/ belum di-collect, WhiteNoise baca langsung dari
+# STATICFILES_DIRS (static/) pakai finders.
+WHITENOISE_USE_FINDERS = not (BASE_DIR / 'staticfiles').is_dir()
 
 
 def _supabase_url_from_database_url(database_url):
@@ -182,8 +188,6 @@ SUPABASE_URL = (
 SUPABASE_SERVICE_KEY = os.environ.get(
     'SUPABASE_SERVICE_KEY', os.environ.get('SUPABASE_KEY', ''))
 SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'foto-siswa')
-
-_STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 if SUPABASE_URL and SUPABASE_SERVICE_KEY:
     STORAGES = {
