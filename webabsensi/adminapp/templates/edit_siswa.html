@@ -122,15 +122,41 @@ page_subtitle %}Perbarui informasi data siswa{% endblock %} {% block content %}
 
       try {
         const { removeBackground } = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
-        const blob = await removeBackground(file);
+        const rawBlob = await removeBackground(file);
         
-        const transparentFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".png", { type: "image/png" });
+        // Kompres & resize ke max 800px agar payload kecil (< 1MB), aman dari limit 4.5MB Vercel
+        const compressedBlob = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 800;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob((b) => resolve(b || rawBlob), 'image/png');
+          };
+          img.src = URL.createObjectURL(rawBlob);
+        });
+
+        const transparentFile = new File([compressedBlob], file.name.replace(/\.[^/.]+$/, "") + ".png", { type: "image/png" });
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(transparentFile);
         realInput.files = dataTransfer.files;
 
         if (previewImg) {
-          previewImg.src = URL.createObjectURL(blob);
+          previewImg.src = URL.createObjectURL(compressedBlob);
           previewContainer.classList.remove('hidden');
         }
         if (statusEl) {
