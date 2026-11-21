@@ -19,17 +19,26 @@
     {% block extra_head %}{% endblock %}
   </head>
   <body class="admin-body">
-    <div class="admin-wra pper">
+    <div class="admin-wrapper">
       <!-- Sidebar -->
       {% include 'snippets/sidebar.html' %}
+
+      <!-- Sidebar Overlay for Mobile -->
+      <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
 
       <!-- Main Content Area -->
       <div class="admin-main">
         <!-- Header -->
         <header class="admin-header">
-          <div class="admin-header-title">
-            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
-            <p>{% block page_subtitle %}Selamat datang kembali, Admin{% endblock %}</p>
+          <div class="flex items-center gap-3">
+            <!-- Mobile Menu Toggle Button -->
+            <button id="mobile-menu-btn" type="button" aria-label="Toggle Menu" class="lg:hidden p-2 text-gray-600 hover:text-indigo-600 focus:outline-none rounded-lg border border-gray-200">
+              <i class="fas fa-bars text-xl"></i>
+            </button>
+            <div class="admin-header-title">
+              <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+              <p>{% block page_subtitle %}Selamat datang kembali, Admin{% endblock %}</p>
+            </div>
           </div>
           <div class="admin-header-date">
             <i class="far fa-calendar-alt"></i>
@@ -57,5 +66,25 @@
     </div>
 
     {% block extra_js %}{% endblock %}
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const menuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.querySelector('.admin-sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        function toggleSidebar() {
+          if (sidebar) sidebar.classList.toggle('open');
+          if (overlay) overlay.classList.toggle('hidden');
+        }
+
+        if (menuBtn) {
+          menuBtn.addEventListener('click', toggleSidebar);
+        }
+        if (overlay) {
+          overlay.addEventListener('click', toggleSidebar);
+        }
+      });
+    </script>
   </body>
 </html>
