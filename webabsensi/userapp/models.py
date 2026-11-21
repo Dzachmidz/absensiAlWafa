@@ -10,8 +10,7 @@ except ImportError:
     remove = None
 
 
-def process_student_photo(image_field, size=600, top_pad=0.06):
-    # ponytail: synchronous CPU rembg on save; move to background worker if upload batch > 10
+def process_student_photo(image_field, size=600, top_pad=0.04):
     image_field.seek(0)
     img = ImageOps.exif_transpose(Image.open(image_field)).convert("RGBA")
     if remove:
@@ -19,8 +18,7 @@ def process_student_photo(image_field, size=600, top_pad=0.06):
     else:
         nobg = img
 
-    # Cek apakah gambar memiliki transparansi (alpha channel tidak semuanya 255)
-    # Jika gambar memiliki transparansi (karena rembg), lakukan crop ke subjek transparan (bbox)
+    # Cek apakah gambar memiliki transparansi
     alpha = nobg.split()[-1]
     has_transparency = alpha.getextrema() != (255, 255)
 
@@ -29,15 +27,19 @@ def process_student_photo(image_field, size=600, top_pad=0.06):
         if bbox:
             nobg = nobg.crop(bbox)
         w, h = nobg.size
-        # Crop bagian bawah dada/pundak jika terlalu panjang
-        max_h = int(w * 1.15)
-        if h > max_h:
-            nobg = nobg.crop((0, 0, w, max_h))
-            w, h = nobg.size
-        scale = min(size / w, (size * (1 - top_pad)) / h)
+        # Zoom subjek agar proporsional di ID Card (isi ~92% tinggi dan max 96% lebar)
+        target_h = int(size * 0.92)
+        scale_by_h = target_h / h
+        # Jika setelah di-scale tingginya, lebarnya melebihi kanvas, scale berdasarkan lebar
+        if int(w * scale_by_h) > int(size * 0.96):
+            scale = (size * 0.96) / w
+        else:
+            scale = scale_by_h
+            
         nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
         resized = nobg.resize((nw, nh), Image.Resampling.LANCZOS)
         canvas = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+        # Tempel pas menempel di bagian bawah (y = size - nh), rata tengah horizontal
         canvas.paste(resized, ((size - nw) // 2, size - nh), resized)
     else:
         # Foto biasa (tanpa hapus background): center-crop persegi proporsional
