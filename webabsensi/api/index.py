@@ -10,22 +10,32 @@ if str(BASE_DIR) not in sys.path:
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'absensi.settings')
 
-django_app = None
-init_error = None
+from django.core.wsgi import get_wsgi_application
 
 try:
-    from django.core.wsgi import get_wsgi_application
-    django_app = get_wsgi_application()
-except Exception as e:
-    init_error = traceback.format_exc()
+    _django_app = get_wsgi_application()
+except Exception:
+    _django_app = None
+    _startup_error = traceback.format_exc()
+else:
+    _startup_error = None
 
-def app(environ, start_response):
-    if init_error:
+# Vercel looks for 'app' or 'handler'
+def handler(environ, start_response):
+    if _startup_error:
         status = '500 Internal Server Error'
         headers = [('Content-Type', 'text/plain; charset=utf-8')]
         start_response(status, headers)
-        error_msg = f"Django WSGI Initialization Failed:\n\n{init_error}"
-        return [error_msg.encode('utf-8')]
+        return [f"Startup Error:\n\n{_startup_error}".encode('utf-8')]
     
-    return django_app(environ, start_response)
+    try:
+        return _django_app(environ, start_response)
+    except Exception:
+        status = '500 Internal Server Error'
+        headers = [('Content-Type', 'text/plain; charset=utf-8')]
+        start_response(status, headers)
+        return [f"Runtime Request Error:\n\n{traceback.format_exc()}".encode('utf-8')]
+
+app = handler
+
 
