@@ -1,16 +1,23 @@
 from django.db import models
 from django.core.files.base import ContentFile
 from PIL import Image, ImageOps
-from rembg import remove
 import datetime
 import io
+
+try:
+    from rembg import remove
+except ImportError:
+    remove = None
 
 
 def process_student_photo(image_field, size=600, top_pad=0.06):
     # ponytail: synchronous CPU rembg on save; move to background worker if upload batch > 10
     image_field.seek(0)
     img = ImageOps.exif_transpose(Image.open(image_field)).convert("RGBA")
-    nobg = remove(img)
+    if remove:
+        nobg = remove(img)
+    else:
+        nobg = img
     bbox = nobg.getbbox()
     if bbox:
         nobg = nobg.crop(bbox)
