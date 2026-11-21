@@ -626,6 +626,7 @@ def edit_siswa_view(request, id):
         kelas_id = request.POST.get('kelas_id')
         no_telepon = request.POST.get('no_telepon')
         foto = request.FILES.get('foto')
+        hapus_foto = request.POST.get('hapus_foto') == '1'
 
         try:
             # Nik unique check (exclude self)
@@ -641,7 +642,11 @@ def edit_siswa_view(request, id):
                 siswa.nik = nik
                 siswa.kelas = kelas_obj
                 siswa.no_telepon = no_telepon
-                if foto:
+                if hapus_foto:
+                    if siswa.foto:
+                        siswa.foto.delete(save=False)
+                    siswa.foto = None
+                elif foto:
                     siswa.foto = foto
                 siswa.save()
                 messages.success(
