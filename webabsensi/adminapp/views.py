@@ -7,9 +7,181 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from userapp.models import Siswa, Absensi, RfidLog, Kelas, JadwalSesi
 from django.db import models
+from django.utils import timezone
 import datetime
 import openpyxl
+import re
 import time
+
+
+_IMPORT_SESSION_KEY = 'import_siswa_preview'
+
+
+def _norm_key(value):
+    """Normalisasi teks header: lowercase, spasi dirapatkan."""
+    return re.sub(r'\s+', ' ', str(value or '')).strip().lower()
+
+
+def _norm_rombel(value):
+    """Nama kelas/rombel: UPPERCASE + spasi dirapatkan."""
+    return re.sub(r'\s+', ' ', str(value or '')).strip().upper()
+
+
+def _norm_phone(value):
+    """Ubah nomor HP ke format WhatsApp: 08xx / +62xx / 8xx -> 62xx."""
+    digits = re.sub(r'\D', '', str(value or ''))
+    if not digits:
+        return '-'
+    if digits.startswith('62'):
+        return digits
+    if digits.startswith('0'):
+        return '62' + digits[1:]
+    if digits.startswith('8'):
+        return '62' + digits
+    return digits
+
+
+def _parse_siswa_excel(file_excel):
+    """Baca file Excel Dapodik/EMIS.
+
+    Header dideteksi otomatis (bukan selalu baris 1), kolom dipetakan by nama:
+    Nama, NISN, HP (fallback Telepon), Rombel Saat Ini.
+    """
+    wb = openpyxl.load_workbook(file_excel, data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+
+    colmap = {}
+    header_idx = None
+    for idx, row in enumerate(rows[:30]):
+        keys = [_norm_key(c) for c in row]
+        if 'nama' not in keys:
+            continue
+        for col, key in enumerate(keys):
+            if key == 'nama':
+                colmap.setdefault('nama', col)
+            elif key == 'nisn':
+                colmap.setdefault('nisn', col)
+            elif key == 'hp':
+                colmap.setdefault('hp', col)
+            elif key == 'telepon':
+                colmap.setdefault('telepon', col)
+            elif key.startswith('rombel'):
+                colmap.setdefault('rombel', col)
+        header_idx = idx
+        break
+
+    if header_idx is None or 'nama' not in colmap:
+        raise ValueError("baris header dengan kolom 'Nama' tidak ditemukan")
+
+    def cell(row, key):
+        col = colmap.get(key)
+        if col is None or col >= len(row):
+            return None
+        return row[col]
+
+    items = []
+    for row in rows[header_idx + 1:]:
+        nama = re.sub(r'\s+', ' ', str(cell(row, 'nama') or '')).strip()
+        if not nama or _norm_key(nama) == 'nama':
+            continue                          # baris kosong / baris header ulang
+
+        nisn = str(cell(row, 'nisn') or '').strip()
+        if nisn.endswith('.0'):                # Excel kadang baca NISN jadi float
+            nisn = nisn[:-2]
+
+        items.append({
+            'nama': nama.upper(),
+            'nisn': nisn,
+            'no_telepon': _norm_phone(cell(row, 'hp') or cell(row, 'telepon')),
+            'rombel': _norm_rombel(cell(row, 'rombel')),
+        })
+    return items
+
+
+def _run_import_siswa(items, jenjang, kelas_map=None):
+    """Import baris siswa: kelas mengikuti rombel, NISN jadi NIK/NIS.
+
+    NISN yang sudah ada -> datanya diperbarui (nama, kelas, no. telepon).
+    """
+    kelas_map = kelas_map or {}
+    jenjang = (jenjang or 'KB').upper()
+
+    kelas_per_rombel = {}
+    kelas_dibuat, jenjang_diubah = [], []
+
+    for rombel in sorted({i['rombel'] for i in items if i['rombel']}):
+        info = kelas_map.get(rombel, {})
+        nama_kelas = _norm_rombel(info.get('nama_kelas') or rombel)
+        jenjang_kelas = (info.get('jenjang') or jenjang).upper()
+
+        kelas, created = Kelas.objects.get_or_create(
+            nama_kelas=nama_kelas, defaults={'jenjang': jenjang_kelas})
+        if created:
+            kelas_dibuat.append(nama_kelas)
+        elif kelas.jenjang != jenjang_kelas:
+            jenjang_diubah.append(f"{nama_kelas} ({kelas.jenjang}->{jenjang_kelas})")
+            kelas.jenjang = jenjang_kelas
+            kelas.save(update_fields=['jenjang'])
+
+        kelas_per_rombel[rombel] = kelas
+
+    dibuat, diperbarui, tanpa_nisn, tanpa_kelas, gagal = 0, 0, 0, 0, 0
+
+    for item in items:
+        kelas = kelas_per_rombel.get(item['rombel'])
+        if kelas is None:
+            tanpa_kelas += 1
+            continue
+
+        nisn = item['nisn'] or '-'
+        if not item['nisn']:
+            tanpa_nisn += 1
+
+        try:
+            _, created = Siswa.objects.update_or_create(
+                nik=nisn,
+                defaults={
+                    'nama': item['nama'],
+                    'kelas': kelas,
+                    'no_telepon': item['no_telepon'],
+                })
+        except Exception:
+            gagal += 1
+            continue
+
+        if created:
+            dibuat += 1
+        else:
+            diperbarui += 1
+
+    return {
+        'dibuat': dibuat,
+        'diperbarui': diperbarui,
+        'tanpa_nisn': tanpa_nisn,
+        'tanpa_kelas': tanpa_kelas,
+        'gagal': gagal,
+        'kelas_dibuat': kelas_dibuat,
+        'jenjang_diubah': jenjang_diubah,
+    }
+
+
+def _flash_import_result(request, hasil):
+    parts = [f"{hasil['dibuat']} siswa baru",
+             f"{hasil['diperbarui']} siswa diperbarui"]
+    if hasil['kelas_dibuat']:
+        parts.append("kelas dibuat: " + ", ".join(hasil['kelas_dibuat']))
+    if hasil['jenjang_diubah']:
+        parts.append("jenjang kelas diubah: " +
+                     ", ".join(hasil['jenjang_diubah']))
+    if hasil['tanpa_nisn']:
+        parts.append(f"{hasil['tanpa_nisn']} baris tanpa NISN")
+    if hasil['tanpa_kelas']:
+        parts.append(f"{hasil['tanpa_kelas']} baris tanpa rombel dilewati")
+    if hasil['gagal']:
+        parts.append(f"{hasil['gagal']} baris gagal disimpan")
+
+    messages.success(request, "Import selesai: " + "; ".join(parts))
 
 
 def login_view(request):
@@ -495,87 +667,122 @@ def cetak_id_card_bulk_view(request):
 
 @login_required(login_url='login')
 def import_siswa_view(request):
-    if request.method == 'POST':
-        if 'file_excel' not in request.FILES:
-            messages.error(request, "File tidak ditemukan.")
-            return redirect('data_siswa')
+    """Import siswa dari Excel ODS/Dapodik: nama, NISN, HP, dan kelas per baris
+    mengikuti kolom 'Rombel Saat Ini'. Dropdown jenjang menentukan jenjang
+    kelas yang dipakai/dibuat pada import ini."""
+    if request.method != 'POST':
+        return redirect('data_siswa')
 
-        file_excel = request.FILES['file_excel']
-        kelas_id = request.POST.get('kelas_id')
+    file_excel = request.FILES.get('file_excel')
+    jenjang = (request.POST.get('jenjang') or 'KB').upper()
 
-        kelas_obj = None
-        if kelas_id:
-            try:
-                kelas_obj = Kelas.objects.get(id=kelas_id)
-            except Kelas.DoesNotExist:
-                messages.error(request, "Kelas tidak valid.")
-                return redirect('data_siswa')
+    if not file_excel:
+        messages.error(request, "File tidak ditemukan.")
+        return redirect('data_siswa')
+    if not file_excel.name.lower().endswith('.xlsx'):
+        messages.error(request, "Format file harus .xlsx")
+        return redirect('data_siswa')
 
-        if not file_excel.name.endswith('.xlsx'):
-            messages.error(request, "Format file harus .xlsx")
-            return redirect('data_siswa')
+    try:
+        items = _parse_siswa_excel(file_excel)
+    except Exception as e:
+        messages.error(request, f"Gagal membaca file: {e}")
+        return redirect('data_siswa')
 
-        try:
-            wb = openpyxl.load_workbook(file_excel)
-            ws = wb.active
+    if not items:
+        messages.warning(
+            request, "Tidak ada baris data yang bisa diimport. Pastikan ada kolom 'Nama'.")
+        return redirect('data_siswa')
 
-            count_success = 0
+    rombel_excel = sorted({i['rombel'] for i in items if i['rombel']})
+    kelas_ada = {k.nama_kelas.strip().upper(): k for k in Kelas.objects.all()}
+    rombel_baru = [r for r in rombel_excel if r not in kelas_ada]
 
-            # Mencari kolom 'Nama Santri'
-            header_row = next(ws.iter_rows(
-                min_row=1, max_row=1, values_only=True))
-            try:
-                headers = [str(h).lower().strip()
-                           if h else '' for h in header_row]
-                nama_index = -1
-                for i, h in enumerate(headers):
-                    if 'nama santri' in h:
-                        nama_index = i
-                        break
+    # Rombel belum ada di tabel Kelas -> minta konfirmasi nama kelas dulu
+    if rombel_baru:
+        request.session[_IMPORT_SESSION_KEY] = {
+            'items': items,
+            'jenjang': jenjang,
+            'rombel_baru': rombel_baru,
+            'rombel_ada': [r for r in rombel_excel if r in kelas_ada],
+        }
+        return render(request, 'import_konfirmasi.html', {
+            'rombel_baru': rombel_baru,
+            'rombel_ada': [r for r in rombel_excel if r in kelas_ada],
+            'jenjang': jenjang,
+            'jenjang_choices': Kelas.JENJANG_CHOICES,
+            'jumlah_baris': len(items),
+        })
 
-                if nama_index == -1:
-                    nama_index = 1  # Fallback B
-            except:
-                nama_index = 1
-
-            current_time = int(time.time())
-
-            for index, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
-                if not row:
-                    continue
-
-                # Check bounds
-                if len(row) <= nama_index:
-                    continue
-
-                nama = row[nama_index]
-                if not nama:
-                    continue
-
-                dummy_nik = f"IMP.{current_time}.{index+1}"
-
-                try:
-                    Siswa.objects.create(
-                        nama=nama,
-                        nik=dummy_nik,
-                        kelas=kelas_obj,
-                        no_telepon="-"
-                    )
-                    count_success += 1
-                except Exception as e:
-                    print(f"Error importing row {index}: {e}")
-
-            if count_success > 0:
-                messages.success(
-                    request, f"Berhasil mengimport {count_success} data siswa.")
-            else:
-                messages.warning(
-                    request, "Tidak ada data yang berhasil diimport. Pastikan format kolom benar.")
-
-        except Exception as e:
-            messages.error(request, f"Gagal memproses file: {e}")
-
+    hasil = _run_import_siswa(items, jenjang)
+    _flash_import_result(request, hasil)
     return redirect('data_siswa')
+
+
+@login_required(login_url='login')
+def import_konfirmasi_view(request):
+    """Langkah 2: user menentukan nama kelas untuk rombel baru, lalu import dijalankan."""
+    data = request.session.get(_IMPORT_SESSION_KEY)
+    if request.method != 'POST':
+        return redirect('data_siswa')
+    if not data:
+        messages.error(
+            request, "Sesi import sudah tidak tersedia. Silakan upload ulang file Excel.")
+        return redirect('data_siswa')
+
+    mapping = {}
+    for i, rombel in enumerate(data.get('rombel_baru', [])):
+        nama_kelas = _norm_rombel(request.POST.get(f'nama_{i}') or rombel)
+        jenjang_kelas = (
+            request.POST.get(f'jenjang_{i}') or data.get('jenjang') or 'KB').upper()
+        mapping[rombel] = {'nama_kelas': nama_kelas,
+                           'jenjang': jenjang_kelas}
+
+    request.session.pop(_IMPORT_SESSION_KEY, None)
+
+    hasil = _run_import_siswa(data['items'], data.get('jenjang', 'KB'), mapping)
+    _flash_import_result(request, hasil)
+    return redirect('data_siswa')
+
+
+@login_required(login_url='login')
+def export_siswa_view(request):
+    """Export data semua siswa (semua kelas) ke .xlsx, opsional filter jenjang."""
+    jenjang = request.GET.get('jenjang', '')
+    siswa_list = Siswa.objects.select_related(
+        'kelas').all().order_by('kelas__nama_kelas', 'nama')
+    if jenjang:
+        siswa_list = siswa_list.filter(kelas__jenjang=jenjang)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Data Siswa'
+    ws.append(['No', 'Nama', 'NIK/NIS', 'Kelas', 'Jenjang',
+               'No. Telepon', 'RFID UID', 'Status RFID', 'Tanggal Daftar'])
+
+    for index, s in enumerate(siswa_list, 1):
+        ws.append([
+            index,
+            s.nama,
+            s.nik,
+            s.kelas.nama_kelas if s.kelas else '-',
+            s.kelas.jenjang if s.kelas else '-',
+            s.no_telepon or '-',
+            s.rfid_uid or '-',
+            'Terdaftar' if s.rfid_uid else 'Belum Ada',
+            timezone.localtime(s.created_at).strftime(
+                '%Y-%m-%d %H:%M') if s.created_at else '-',
+        ])
+
+    for column, width in zip('ABCDEFGHI', (6, 32, 16, 220, 10, 18, 18, 14, 18)):
+        ws.column_dimensions[column].width = width
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    label = jenjang or 'Semua'
+    response['Content-Disposition'] = f'attachment; filename="Data_Siswa_{label}.xlsx"'
+    wb.save(response)
+    return response
 
 
 @login_required(login_url='login')

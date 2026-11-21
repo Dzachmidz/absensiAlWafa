@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import dashboard_view, registrasi_rfid_view, data_kelas_view, data_siswa_view, riwayat_absensi_view, login_view, logout_view, edit_siswa_view, import_siswa_view, absensi_manual_view, kelola_sesi_view, cetak_id_card_view, cetak_id_card_bulk_view
+from .views import dashboard_view, registrasi_rfid_view, data_kelas_view, data_siswa_view, riwayat_absensi_view, login_view, logout_view, edit_siswa_view, import_siswa_view, import_konfirmasi_view, export_siswa_view, absensi_manual_view, kelola_sesi_view, cetak_id_card_view, cetak_id_card_bulk_view
 
 urlpatterns = [
     path('', dashboard_view, name='dashboard'),
@@ -15,6 +15,9 @@ urlpatterns = [
     path('data-siswa/cetak-id-bulk/',
          cetak_id_card_bulk_view, name='cetak_id_card_bulk'),
     path('data-siswa/import/', import_siswa_view, name='import_siswa'),
+    path('data-siswa/import/konfirmasi/', import_konfirmasi_view,
+         name='import_konfirmasi'),
+    path('data-siswa/export/', export_siswa_view, name='export_siswa'),
     path('absensi-manual/', absensi_manual_view, name='absensi_manual'),
     path('registrasi-rfid/', registrasi_rfid_view, name='registrasi_rfid'),
     path('riwayat-absensi/', riwayat_absensi_view, name='riwayat_absensi'),

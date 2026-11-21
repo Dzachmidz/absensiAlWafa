@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Konfirmasi Kelas Baru - Absensi Al Wafa{% endblock %}
+
+{% block page_title %}Konfirmasi Kelas Baru{% endblock %}
+{% block page_subtitle %}Rombel berikut belum ada di tabel kelas. Atur namanya sebelum import disimpan.{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="admin-card">
+    <div class="admin-card-header">
+      <h3><i class="fas fa-exclamation-triangle text-amber-500"></i> Rombel Belum Terdaftar</h3>
+    </div>
+    <div class="admin-card-body">
+      <div class="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+        <strong>{{ jumlah_baris }}</strong> baris siap diimport dengan jenjang
+        <strong>{{ jenjang }}</strong>. Kelas baru akan dibuat dengan jenjang tersebut (bisa diubah per baris).
+      </div>
+
+      <form method="POST" action="{% url 'import_konfirmasi' %}">
+        {% csrf_token %}
+
+        <div class="space-y-3 mb-6">
+          {% for rombel in rombel_baru %}
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end p-3 rounded-lg border border-gray-200">
+            <div class="md:col-span-2">
+              <label class="form-label text-xs">
+                Nama Kelas Untuk Rombel Excel: <span class="font-mono text-gray-700">{{ rombel }}</span>
+              </label>
+              <input type="text" name="nama_{{ forloop.counter0 }}" value="{{ rombel }}"
+                     required class="form-input" placeholder="Contoh: AL IDRISI" />
+            </div>
+            <div>
+              <label class="form-label text-xs">Jenjang</label>
+              <select name="jenjang_{{ forloop.counter0 }}" class="form-select">
+                {% for code, label in jenjang_choices %}
+                <option value="{{ code }}" {% if jenjang == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if rombel_ada %}
+        <div class="mb-6 p-3 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700">
+          <p class="font-semibold mb-1">Kelas sudah ada (dipakai langsung):</p>
+          <p class="font-mono text-xs">{{ rombel_ada|join:", " }}</p>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+          <a href="{% url 'data_siswa' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Batal
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-check"></i> Simpan Kelas & Import
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
