@@ -107,7 +107,7 @@
             <td>
               <div class="flex items-center gap-3">
                 {% if s.foto %}
-                <img src="{{ s.foto.url }}" alt="{{ s.nama }}" class="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-200">
+                <img src="{{ s.foto.url }}" alt="{{ s.nama }}" loading="lazy" decoding="async" class="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-200">
                 {% else %}
                 <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
                   {{ s.nama|slice:":1"|upper }}
