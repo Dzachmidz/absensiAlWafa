@@ -25,18 +25,19 @@
             gap: 20px; /* Jarak antar set kartu saat preview di browser */
         }
 
-        /* Ukuran standar Box ID Card */
+        /* Ukuran standar Box ID Card (CR-80 Mifare: 54mm x 85.6mm) */
         .id-card-wrapper {
             position: relative;
             width: 54mm; 
-            height: 85mm; 
+            height: 85.6mm; 
             background-color: #fff;
             background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
-            border-radius: 3mm;
+            border-radius: 3.18mm;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             overflow: hidden;
+            box-sizing: border-box;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -146,44 +147,71 @@
 
         /* CONTAINER UNTUK MENJAJEJARKAN DEPAN & BELAKANG */
         .kartu-container {
-            display: inline-flex; /* Menggunakan inline-flex agar kartu tidak memanjang penuh */
+            display: inline-flex;
             gap: 5mm;
             align-items: center;
             justify-content: center;
-            page-break-inside: avoid; /* Memastikan kartu tidak terpotong di halaman print */
-            break-inside: avoid;     /* Properti modern untuk mencegah kepotong */
-            margin-bottom: 5mm;      /* Jarak bawah setiap set ID card */
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-bottom: 5mm;
         }
 
-        /* KARTU BAGIAN BELAKANG */
+        /* KARTU BAGIAN BELAKANG (CR-80 Mifare: 54mm x 85.6mm) */
         .id-card-back {
             position: relative;
             width: 54mm;
-            height: 85mm;
+            height: 85.6mm;
             background-color: #fff;
             background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
-            border-radius: 3mm;
+            border-radius: 3.18mm;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             overflow: hidden;
+            box-sizing: border-box;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
 
+        /* Mode Cetak: 1 Halaman PDF = 1 Sisi Kartu Pas Standar CR-80 (54mm x 85.6mm) */
         @media print {
             @page {
-                /* Kami hilangkan batasan ukuran 120x95 karena sekarang bisa memakai layout A4 bebas */
-                margin: 5mm; 
+                size: 54mm 85.6mm;
+                margin: 0;
+            }
+            html, body {
+                width: 54mm;
+                height: 85.6mm;
+                margin: 0 !important;
+                padding: 0 !important;
+                background-color: transparent !important;
             }
             body {
-                background-color: #fff;
-                padding: 0;
-                gap: 5mm; /* Tetap beri sedikit jarak antar kartu di saat cetak PDF (A4) */
+                display: block !important;
+            }
+            .kartu-container {
+                display: block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                gap: 0 !important;
             }
             .id-card-wrapper, .id-card-back {
-                box-shadow: none !important; 
+                width: 54mm !important;
+                height: 85.6mm !important;
+                max-width: 54mm !important;
+                max-height: 85.6mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
                 border-radius: 0 !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            /* Hilangkan page break di elemen kartu paling terakhir */
+            .kartu-container:last-child .id-card-back {
+                page-break-after: auto !important;
+                break-after: auto !important;
             }
         }
 

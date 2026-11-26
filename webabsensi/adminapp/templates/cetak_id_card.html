@@ -25,23 +25,19 @@
             gap: 20px; /* Jarak antar set kartu saat preview di browser */
         }
 
-        /* Ukuran standar Box ID Card (Asumsi rasio kartu vertikal) 
-           Anda bisa mengecilkan/membesarkan persentase angka jika kurang pas */
+        /* Ukuran standar Box ID Card (CR-80 Mifare: 54mm x 85.6mm) */
         .id-card-wrapper {
             position: relative;
-            width: 54mm; /* Lebar Kartu dibuat real ukurannya 54mm */
-            height: 85mm; /* Tinggi Kartu 85mm */
+            width: 54mm;
+            height: 85.6mm;
             background-color: #fff;
-    
-            
-            background-size: 100% 100%; /* MEMAKSA GAMBAR PAS DI KOTAK TANPA DIPOTONG */
+            background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
-            border-radius: 3mm; /* Dibuat tumpul agar mirip layout kartu asli */
+            border-radius: 3.18mm;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             overflow: hidden;
-            
-            /* Penting: Fitur agar warna background ditarik walau di mode print Chrome */
+            box-sizing: border-box;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -154,20 +150,19 @@
             left: 7%; /* Silakan edit posisi left kelas untuk TPQ & MADIN */
         }
 
-        /* KARTU BAGIAN BELAKANG */
+        /* KARTU BAGIAN BELAKANG (CR-80 Mifare: 54mm x 85.6mm) */
         .id-card-back {
             position: relative;
             width: 54mm;
-            height: 85mm;
+            height: 85.6mm;
             background-color: #fff;
-            
             background-size: 100% 100%;
             background-position: center;
             background-repeat: no-repeat;
-            border-radius: 3mm;
+            border-radius: 3.18mm;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             overflow: hidden;
-            
+            box-sizing: border-box;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -175,26 +170,50 @@
         /* CONTAINER UNTUK MENJAJEJARKAN DEPAN & BELAKANG */
         .kartu-container {
             display: flex;
-            flex-direction: row; /* PAKSA MENYAMPING HORIZONTAL */
-            gap: 5mm; 
+            flex-direction: row;
+            gap: 20px;
             align-items: flex-start;
             justify-content: center;
         }
 
-        /* Agar jika file di-print, body/hitam disekeliling hilang dan fokus ke ukuran asli kartu */
+        /* Mode Cetak: 1 Halaman PDF = 1 Sisi Kartu Pas Standar CR-80 (54mm x 85.6mm) */
         @media print {
             @page {
-                /* Menggunakan default margin size kertas (bisa menggunakan A4 di print setting) */
-                margin: 5mm; 
+                size: 54mm 85.6mm;
+                margin: 0;
+            }
+            html, body {
+                width: 54mm;
+                height: 85.6mm;
+                margin: 0 !important;
+                padding: 0 !important;
+                background-color: transparent !important;
             }
             body {
-                background-color: #fff;
-                padding: 0;
-                gap: 5mm; /* Tetap beri sedikit jarak antar kartu di saat cetak PDF (A4) */
+                display: block !important;
+            }
+            .kartu-container {
+                display: block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                gap: 0 !important;
             }
             .id-card-wrapper, .id-card-back {
-                box-shadow: none !important; /* Hilangkan bayangan saat diprint */
-                border-radius: 0 !important; /* Hindari pemotongan putih kalau kertasnya melengkung */
+                width: 54mm !important;
+                height: 85.6mm !important;
+                max-width: 54mm !important;
+                max-height: 85.6mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .id-card-back {
+                page-break-after: auto !important;
+                break-after: auto !important;
             }
         }
 
