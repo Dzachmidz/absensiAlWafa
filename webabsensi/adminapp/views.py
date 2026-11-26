@@ -5,7 +5,8 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
-from userapp.models import Siswa, Absensi, RfidLog, Kelas, JadwalSesi
+from userapp.models import Siswa, Absensi, RfidLog, Kelas, JadwalSesi, JadwalKhusus
+from userapp.views import kirim_wa_gateway
 from django.db import models
 from django.utils import timezone
 import datetime
@@ -211,23 +212,95 @@ def logout_view(request):
 
 @login_required(login_url='login')
 def dashboard_view(request):
+    today = datetime.date.today()
+
+    # Handle Set Jadwal Khusus Pulang dari Dashboard
+    if request.method == 'POST' and request.POST.get('action') == 'set_jadwal_khusus':
+        cakupan = request.POST.get('cakupan', 'semua')
+        jenjang = request.POST.get('jenjang') or None
+        kelas_id = request.POST.get('kelas_id') or None
+        jam_pulang_mulai = request.POST.get('jam_pulang_mulai')
+        alasan = request.POST.get('alasan', 'Kegiatan Khusus / Pulang Lebih Awal').strip()
+        broadcast_wa = request.POST.get('broadcast_wa') == '1'
+
+        try:
+            kelas_obj = Kelas.objects.get(id=kelas_id) if kelas_id else None
+            jadwal_k = JadwalKhusus.objects.create(
+                tanggal=today,
+                cakupan=cakupan,
+                jenjang=jenjang,
+                kelas=kelas_obj,
+                jam_pulang_mulai=jam_pulang_mulai,
+                alasan=alasan,
+                aktif=True
+            )
+
+            # Broadcast WA jika dicentang
+            wa_sent_count = 0
+            if broadcast_wa:
+                target_siswa = Siswa.objects.exclude(no_telepon__isnull=True).exclude(no_telepon='')
+                if cakupan == 'jenjang' and jenjang:
+                    target_siswa = target_siswa.filter(kelas__jenjang=jenjang)
+                elif cakupan == 'kelas' and kelas_obj:
+                    target_siswa = target_siswa.filter(kelas=kelas_obj)
+
+                pesan_broadcast = (
+                    f"Assalamu'alaikum Wr. Wb.\n\n"
+                    f"*PENGUMUMAN KEPULANGAN KHUSUS HARI INI*\n"
+                    f"Diberitahukan kepada seluruh wali murid:\n"
+                    f"Pada hari ini ({today.strftime('%d-%m-%Y')}), kegiatan belajar mengajar selesai dan absen kepulangan dibuka mulai pukul *{jam_pulang_mulai} WIB*.\n"
+                    f"Keterangan/Alasan: *{alasan}*.\n\n"
+                    f"Mohon bagi penjemput dapat menyesuaikan waktu kepulangan santri.\n"
+                    f"Terima kasih atas perhatian dan kerja samanya.\n\n"
+                    f"_Pondok Pesantren / Sekolah Al-Wafa_"
+                )
+
+                for s in target_siswa:
+                    if kirim_wa_gateway(s.no_telepon, pesan_broadcast):
+                        wa_sent_count += 1
+
+            msg_sukses = f"Jadwal pulang khusus berhasil diatur (Mulai jam {jam_pulang_mulai})."
+            if broadcast_wa:
+                msg_sukses += f" Broadcast WA berhasil dikirim ke {wa_sent_count} wali murid."
+            messages.success(request, msg_sukses)
+        except Exception as e:
+            messages.error(request, f"Gagal menyimpan jadwal khusus: {e}")
+        return redirect('dashboard')
+
+    # Handle Hapus / Nonaktifkan Jadwal Khusus
+    if request.method == 'POST' and request.POST.get('action') == 'hapus_jadwal_khusus':
+        jadwal_id = request.POST.get('jadwal_id')
+        JadwalKhusus.objects.filter(id=jadwal_id).delete()
+        messages.success(request, "Jadwal khusus berhasil dinonaktifkan/dihapus.")
+        return redirect('dashboard')
+
     # Hitung ringkasan data
     total_siswa = Siswa.objects.count()
     absen_hari_ini = Absensi.objects.filter(
-        tanggal=datetime.date.today()).count()
+        tanggal=today).count()
     belum_hadir = total_siswa - absen_hari_ini
     if belum_hadir < 0:
         belum_hadir = 0
 
-    # Ambil 5 aktivitas absensi terakhir hari ini (atau global jika perlu)
+    # Ambil jadwal khusus hari ini
+    jadwal_khusus_hari_ini = JadwalKhusus.objects.filter(
+        tanggal=today, aktif=True
+    ).select_related('kelas')
+
+    # Ambil 5 aktivitas absensi terakhir hari ini
     recent_activity = Absensi.objects.select_related(
         'siswa', 'siswa__kelas').order_by('-tanggal', '-created_at')[:5]
+
+    daftar_kelas = Kelas.objects.all().order_by('nama_kelas')
 
     context = {
         'total_siswa': total_siswa,
         'absen_hari_ini': absen_hari_ini,
         'belum_hadir': belum_hadir,
-        'recent_activity': recent_activity
+        'recent_activity': recent_activity,
+        'jadwal_khusus_hari_ini': jadwal_khusus_hari_ini,
+        'daftar_kelas': daftar_kelas,
+        'jenjang_choices': Kelas.JENJANG_CHOICES,
     }
     return render(request, 'dashboardadmin.html', context)
 

@@ -35,6 +35,166 @@
   </div>
 </div>
 
+<!-- Card Jadwal Pulang Khusus / Event Hari Ini -->
+<div class="admin-card animate-fade-in-up mb-6">
+  <div class="admin-card-header flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h3 class="flex items-center gap-2 text-indigo-900 font-bold">
+        <i class="fas fa-bullhorn text-amber-500"></i> Jadwal Pulang Khusus & Pengumuman Hari Ini
+      </h3>
+      <p class="text-xs text-gray-500 mt-0.5">Atur kepulangan lebih awal untuk acara/kegiatan khusus (setengah hari, hari nasional, rapat, dll)</p>
+    </div>
+    <button type="button" onclick="openModal('modalJadwalKhusus')" class="btn btn-primary text-xs py-2 px-3">
+      <i class="fas fa-plus"></i> Atur Pulang Khusus
+    </button>
+  </div>
+  <div class="admin-card-body">
+    {% if jadwal_khusus_hari_ini %}
+      <div class="space-y-3">
+        {% for jk in jadwal_khusus_hari_ini %}
+        <div class="flex flex-wrap items-center justify-between p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl gap-3">
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-800 text-sm">Buka Pulang: {{ jk.jam_pulang_mulai|time:"H:i" }} WIB</span>
+                <span class="badge badge-warning text-[11px]">
+                  {% if jk.cakupan == 'semua' %}
+                    Semua Sekolah
+                  {% elif jk.cakupan == 'jenjang' %}
+                    Jenjang {{ jk.jenjang }}
+                  {% else %}
+                    Kelas {{ jk.kelas.nama_kelas }}
+                  {% endif %}
+                </span>
+              </div>
+              <p class="text-xs text-gray-700 mt-1">
+                <strong>Alasan/Agenda:</strong> {{ jk.alasan }}
+              </p>
+            </div>
+          </div>
+          <form method="POST" onsubmit="return confirm('Hapus/batalkan jadwal khusus ini?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="hapus_jadwal_khusus">
+            <input type="hidden" name="jadwal_id" value="{{ jk.id }}">
+            <button type="submit" class="text-xs text-red-600 hover:text-red-800 font-medium py-1 px-2.5 rounded-lg border border-red-200 hover:bg-red-50 transition-colors">
+              <i class="fas fa-trash-alt mr-1"></i> Batalkan
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-4 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between text-xs text-gray-500">
+        <div class="flex items-center gap-2">
+          <i class="fas fa-check-circle text-green-500 text-sm"></i>
+          <span>Hari ini jadwal kepulangan berjalan <strong>reguler/normal</strong> sesuai jadwal kelas masing-masing.</span>
+        </div>
+        <span class="text-gray-400">Tidak ada pengumuman pulang khusus aktif</span>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal Atur Jadwal Khusus -->
+<div id="modalJadwalKhusus" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'modalJadwalKhusus')">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-bullhorn mr-2 text-indigo-600"></i> Atur Jadwal Pulang Khusus Hari Ini</h3>
+      <button class="modal-close" onclick="closeModal('modalJadwalKhusus')">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="set_jadwal_khusus">
+      <div class="modal-body space-y-4">
+        <div class="form-group">
+          <label class="form-label font-semibold">Cakupan Kepulangan</label>
+          <select name="cakupan" id="jk-cakupan" class="form-select" onchange="toggleCakupanFields(this.value)" required>
+            <option value="semua">Semua Siswa (Seluruh Sekolah)</option>
+            <option value="jenjang">Per Jenjang Tertentu</option>
+            <option value="kelas">Per Kelas Tertentu</option>
+          </select>
+        </div>
+
+        <div class="form-group hidden" id="group-jenjang">
+          <label class="form-label font-semibold">Pilih Jenjang</label>
+          <select name="jenjang" class="form-select">
+            {% for code, label in jenjang_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group hidden" id="group-kelas">
+          <label class="form-label font-semibold">Pilih Kelas</label>
+          <select name="kelas_id" class="form-select">
+            {% for k in daftar_kelas %}
+            <option value="{{ k.id }}">{{ k.nama_kelas }} ({{ k.jenjang }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label font-semibold">Buka Absen Pulang Mulai Jam</label>
+          <input type="time" name="jam_pulang_mulai" required class="form-input" value="10:30">
+          <p class="text-xs text-gray-500 mt-1">Siswa yang tap RFID sejak jam ini akan tercatat pulang resmi sesuai alasan.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label font-semibold">Alasan / Pengumuman Kepulangan</label>
+          <input type="text" name="alasan" required class="form-input" placeholder="Contoh: Peringatan Hari Pahlawan - Pulang Setengah Hari" value="Kegiatan Khusus / Setengah Hari">
+          <p class="text-xs text-gray-500 mt-1">Keterangan ini akan disertakan dalam notifikasi WhatsApp ke wali murid.</p>
+        </div>
+
+        <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-start gap-2.5">
+          <input type="checkbox" name="broadcast_wa" id="broadcast_wa" value="1" class="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer">
+          <label for="broadcast_wa" class="text-xs text-indigo-950 font-medium cursor-pointer">
+            <strong>Kirim Broadcast WA Sekarang</strong> ke nomor wali murid yang bersangkutan terkait pengumuman pulang hari ini.
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('modalJadwalKhusus')" class="btn btn-outline">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan & Terapkan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+    document.getElementById(id).classList.add('active');
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+    document.getElementById(id).classList.remove('active');
+  }
+  function closeModalOnOverlay(event, id) {
+    if (event.target === document.getElementById(id)) {
+      closeModal(id);
+    }
+  }
+  function toggleCakupanFields(val) {
+    const gJenjang = document.getElementById('group-jenjang');
+    const gKelas = document.getElementById('group-kelas');
+    if (val === 'jenjang') {
+      gJenjang.classList.remove('hidden');
+      gKelas.classList.add('hidden');
+    } else if (val === 'kelas') {
+      gJenjang.classList.add('hidden');
+      gKelas.classList.remove('hidden');
+    } else {
+      gJenjang.classList.add('hidden');
+      gKelas.classList.add('hidden');
+    }
+  }
+</script>
+
 <!-- Activity Card -->
 <div class="admin-card animate-fade-in-up animate-delay-3">
   <div class="admin-card-header">

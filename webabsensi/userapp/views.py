@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.utils import timezone
-from .models import Absensi, Siswa, RfidLog, WaktuOperasional, JadwalSesi
+from .models import Absensi, Siswa, RfidLog, WaktuOperasional, JadwalSesi, JadwalKhusus
 import datetime
 import requests
 import json
@@ -70,7 +70,7 @@ class RfidScanView(APIView):
                     else:
                         active_session = sessions.first()
 
-            # Tentukan batas waktu
+            # Tentukan batas waktu reguler
             if active_session:
                 j_masuk_mulai = active_session.jam_masuk_mulai
                 j_masuk_akhir = active_session.jam_masuk_akhir
@@ -92,6 +92,32 @@ class RfidScanView(APIView):
                 j_pulang_akhir = waktu_op.jam_pulang_akhir
                 sesi_obj = None
 
+            # Cek apakah ada JADWAL KHUSUS hari ini (Event/Pulang Cepat Masal)
+            # Prioritas cek: 1. Per Kelas, 2. Per Jenjang, 3. Semua Sekolah
+            jadwal_khusus = None
+            if kelas_siswa:
+                jadwal_khusus = JadwalKhusus.objects.filter(
+                    tanggal=today, aktif=True, cakupan='kelas', kelas=kelas_siswa
+                ).first()
+                if not jadwal_khusus and kelas_siswa.jenjang:
+                    jadwal_khusus = JadwalKhusus.objects.filter(
+                        tanggal=today, aktif=True, cakupan='jenjang', jenjang=kelas_siswa.jenjang
+                    ).first()
+            if not jadwal_khusus:
+                jadwal_khusus = JadwalKhusus.objects.filter(
+                    tanggal=today, aktif=True, cakupan='semua'
+                ).first()
+
+            is_event_khusus = False
+            alasan_khusus = ""
+            if jadwal_khusus:
+                # Timpa jam mulai & akhir pulang dengan jadwal khusus
+                j_pulang_mulai = jadwal_khusus.jam_pulang_mulai
+                if jadwal_khusus.jam_pulang_akhir:
+                    j_pulang_akhir = jadwal_khusus.jam_pulang_akhir
+                is_event_khusus = True
+                alasan_khusus = jadwal_khusus.alasan
+
             # Cek riwayat absensi siswa hari ini
             open_absensi = Absensi.objects.filter(
                 siswa=siswa,
@@ -103,14 +129,20 @@ class RfidScanView(APIView):
             # KASUS A: SUDAH ABSEN MASUK -> PROSES PULANG
             # ==========================================
             if open_absensi:
-                # Cek batas mulai pulang
-                if current_time < j_pulang_mulai:
-                    jam_mulai_str = j_pulang_mulai.strftime('%H:%M')
-                    jam_masuk_str = open_absensi.jam_masuk.strftime('%H:%M') if open_absensi.jam_masuk else "-"
-                    msg = f"Sudah absen masuk jam {jam_masuk_str}. Belum waktunya pulang (Mulai jam {jam_mulai_str})."
+                # Hitung selisih menit sejak masuk (proteksi tap ganda tidak sengaja dalam 10 menit)
+                menit_sejak_masuk = 999
+                if open_absensi.jam_masuk:
+                    dt_masuk = datetime.datetime.combine(today, open_absensi.jam_masuk)
+                    dt_now = datetime.datetime.combine(today, current_time)
+                    menit_sejak_masuk = max(0, (dt_now - dt_masuk).total_seconds() / 60)
+
+                if menit_sejak_masuk < 10:
+                    # Mencegah kartu tertempel ganda beberapa menit setelah masuk
+                    jam_masuk_str = open_absensi.jam_masuk.strftime('%H:%M')
+                    msg = f"{siswa.nama} baru saja absen masuk jam {jam_masuk_str}. Tunggu beberapa saat untuk absen pulang."
                     return Response({
                         "status": "warning",
-                        "code": "too_early_leave",
+                        "code": "duplicate_tap_protection",
                         "nama": siswa.nama,
                         "kelas": nama_kelas,
                         "waktu": time_str,
@@ -118,31 +150,48 @@ class RfidScanView(APIView):
                         "message": msg
                     }, status=status.HTTP_200_OK)
 
-                # Sudah masuk waktu pulang
-                status_keterangan = "Pulang"
-                if current_time > j_pulang_akhir:
+                # Cek status pulang: Apakah Pulang Cepat, Pulang Normal/Khusus, atau Telat Jemput
+                if current_time < j_pulang_mulai:
+                    # Pulang lebih awal dari jadwal (Pulang Cepat mandiri)
+                    keterangan_pulang = "Pulang Cepat"
+                    alasan_info = "Izin / Pulang Lebih Awal"
+                elif current_time > j_pulang_akhir:
                     keterangan_pulang = "Telat Jemput"
-                    status_kehadiran_update = f"{open_absensi.status_kehadiran} (Telat Jemput)"
+                    alasan_info = alasan_khusus if is_event_khusus else "Penjemputan melebihi batas jadwal"
                 else:
                     keterangan_pulang = "Tepat Waktu"
-                    status_kehadiran_update = open_absensi.status_kehadiran
+                    alasan_info = alasan_khusus if is_event_khusus else "Sesuai Jadwal Kepulangan"
+
+                status_kehadiran_update = open_absensi.status_kehadiran
+                if keterangan_pulang in ["Pulang Cepat", "Telat Jemput"]:
+                    if f"({keterangan_pulang})" not in status_kehadiran_update:
+                        status_kehadiran_update = f"{status_kehadiran_update} ({keterangan_pulang})"
 
                 open_absensi.jam_keluar = current_time
-                if "Telat Jemput" in status_kehadiran_update and "Telat Jemput" not in open_absensi.status_kehadiran:
-                    open_absensi.status_kehadiran = status_kehadiran_update
+                open_absensi.status_kehadiran = status_kehadiran_update
                 open_absensi.save()
 
                 # Log RFID
                 RfidLog.objects.create(
                     rfid_uid=uid,
                     status='success',
-                    keterangan=f"Absen Pulang: {siswa.nama} ({keterangan_pulang}) - {time_str}"
+                    keterangan=f"Absen Pulang: {siswa.nama} ({keterangan_pulang}) - {alasan_info} - {time_str}"
                 )
 
-                # Kirim WA Gateway
+                # Format Pesan WhatsApp yang jelas & informatif
                 nomor_hp = getattr(siswa, 'no_telepon', None)
                 if nomor_hp:
-                    isi_wa = f"Halo, {siswa.nama} berhasil absen Pulang jam {time_str} ({keterangan_pulang})."
+                    isi_wa = (
+                        f"Assalamu'alaikum Wr. Wb.\n\n"
+                        f"Pemberitahuan Absensi:\n"
+                        f"Nama: *{siswa.nama}*\n"
+                        f"Kelas: *{nama_kelas}*\n"
+                        f"Status: *Absen Pulang ({keterangan_pulang})*\n"
+                        f"Waktu: *{time_str} WIB*\n"
+                        f"Keterangan/Alasan: *{alasan_info}*\n\n"
+                        f"Terima kasih.\n"
+                        f"_Sistem Absensi Digital Al-Wafa_"
+                    )
                     kirim_wa_gateway(nomor_hp, isi_wa)
 
                 return Response({
@@ -152,7 +201,8 @@ class RfidScanView(APIView):
                     "waktu": time_str,
                     "mode": "Pulang",
                     "detail_status": keterangan_pulang,
-                    "message": f"Berhasil Absen Pulang ({keterangan_pulang})"
+                    "alasan": alasan_info,
+                    "message": f"Berhasil Absen Pulang ({keterangan_pulang}) - {alasan_info}"
                 }, status=status.HTTP_200_OK)
 
             # ==========================================

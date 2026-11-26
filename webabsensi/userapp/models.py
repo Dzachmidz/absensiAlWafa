@@ -104,6 +104,44 @@ class JadwalSesi(models.Model):
         return f"{self.kelas.nama_kelas} - {self.nama_sesi}"
 
 
+class JadwalKhusus(models.Model):
+    """
+    Model untuk mengatur jadwal pulang cepat / event khusus hari ini:
+    - Bisa berlaku untuk Semua Siswa, Per Jenjang, atau Per Kelas tertentu.
+    - Berlaku pada tanggal tertentu (default hari ini).
+    - Memuat jam_pulang_mulai baru dan alasan/keterangan yang dikirimkan via WA.
+    """
+    TIPE_CAKUPAN = [
+        ('semua', 'Semua Sekolah'),
+        ('jenjang', 'Per Jenjang'),
+        ('kelas', 'Per Kelas'),
+    ]
+
+    tanggal = models.DateField(default=datetime.date.today, verbose_name="Tanggal Berlaku")
+    cakupan = models.CharField(max_length=10, choices=TIPE_CAKUPAN, default='semua')
+    jenjang = models.CharField(max_length=15, choices=Kelas.JENJANG_CHOICES, null=True, blank=True)
+    kelas = models.ForeignKey(Kelas, on_delete=models.CASCADE, null=True, blank=True, related_name='jadwal_khusus_list')
+
+    jam_pulang_mulai = models.TimeField(verbose_name="Buka Absen Pulang Jam")
+    jam_pulang_akhir = models.TimeField(default=datetime.time(17, 0), verbose_name="Batas Akhir Pulang")
+    alasan = models.CharField(max_length=255, verbose_name="Alasan / Pengumuman Pulang Cepat", default="Kegiatan Khusus / Setengah Hari")
+    aktif = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Jadwal Khusus Pulang"
+        verbose_name_plural = "Jadwal Khusus Pulang"
+        ordering = ['-tanggal', '-id']
+
+    def __str__(self):
+        target = "Semua"
+        if self.cakupan == 'jenjang':
+            target = f"Jenjang {self.jenjang}"
+        elif self.cakupan == 'kelas' and self.kelas:
+            target = f"Kelas {self.kelas.nama_kelas}"
+        return f"[{self.tanggal}] {target} - {self.alasan} (Buka {self.jam_pulang_mulai.strftime('%H:%M')})"
+
+
 class WaktuOperasional(models.Model):
     # Singleton Model (hanya 1 baris data)
     jam_masuk_mulai = models.TimeField(default=datetime.time(6, 0))
