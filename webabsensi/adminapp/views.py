@@ -753,7 +753,12 @@ def cetak_id_card_view(request, id):
         Siswa.objects.filter(models.Q(foto__isnull=False) & ~models.Q(foto='')),
         id=id
     )
-    return render(request, 'cetak_id_card.html', {'siswa': siswa})
+    kelas_nama = siswa.kelas.nama_kelas if siswa.kelas else "Tanpa-Kelas"
+    judul_dokumen = f"ID-Card_{siswa.nama}_{kelas_nama}_{siswa.nik}".replace(' ', '_')
+    return render(request, 'cetak_id_card.html', {
+        'siswa': siswa,
+        'judul_dokumen': judul_dokumen
+    })
 
 
 @login_required(login_url='login')
@@ -764,19 +769,34 @@ def cetak_id_card_bulk_view(request):
     
     # Priority 1: Specific IDs from bulk selection
     ids = request.GET.get('ids')
+    judul_suffix = ""
     if ids:
         id_list = [i for i in ids.split(',') if i.isdigit()]
         siswa_list = siswa_list.filter(id__in=id_list)
+        judul_suffix = f"{len(id_list)}_Siswa_Pilihan"
     else:
         # Priority 2: Current filters
         jenjang = request.GET.get('jenjang')
         kelas_id = request.GET.get('kelas_id')
+        parts = []
         if jenjang:
             siswa_list = siswa_list.filter(kelas__jenjang=jenjang)
+            parts.append(jenjang)
         if kelas_id:
             siswa_list = siswa_list.filter(kelas_id=kelas_id)
+            kelas_obj = Kelas.objects.filter(id=kelas_id).first()
+            if kelas_obj:
+                parts.append(kelas_obj.nama_kelas)
+            else:
+                parts.append(f"Kelas_{kelas_id}")
+        judul_suffix = "_".join(parts) if parts else "Semua_Siswa"
+
+    judul_dokumen = f"ID-Card_Massal_{judul_suffix}".replace(' ', '_')
             
-    return render(request, 'cetak_id_card_bulk.html', {'siswa_list': siswa_list})
+    return render(request, 'cetak_id_card_bulk.html', {
+        'siswa_list': siswa_list,
+        'judul_dokumen': judul_dokumen
+    })
 
 
 @login_required(login_url='login')
