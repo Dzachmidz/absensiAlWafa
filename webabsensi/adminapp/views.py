@@ -220,6 +220,7 @@ def dashboard_view(request):
         jenjang = request.POST.get('jenjang') or None
         kelas_id = request.POST.get('kelas_id') or None
         jam_pulang_mulai = request.POST.get('jam_pulang_mulai')
+        jam_pulang_akhir = request.POST.get('jam_pulang_akhir') or '17:00'
         alasan = request.POST.get('alasan', 'Kegiatan Khusus / Pulang Lebih Awal').strip()
         broadcast_wa = request.POST.get('broadcast_wa') == '1'
 
@@ -231,6 +232,7 @@ def dashboard_view(request):
                 jenjang=jenjang,
                 kelas=kelas_obj,
                 jam_pulang_mulai=jam_pulang_mulai,
+                jam_pulang_akhir=jam_pulang_akhir,
                 alasan=alasan,
                 aktif=True
             )

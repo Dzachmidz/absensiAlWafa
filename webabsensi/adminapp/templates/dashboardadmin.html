@@ -138,10 +138,17 @@
           </select>
         </div>
 
-        <div class="form-group">
-          <label class="form-label font-semibold">Buka Absen Pulang Mulai Jam</label>
-          <input type="time" name="jam_pulang_mulai" required class="form-input" value="10:30">
-          <p class="text-xs text-gray-500 mt-1">Siswa yang tap RFID sejak jam ini akan tercatat pulang resmi sesuai alasan.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="form-group">
+            <label class="form-label font-semibold">Buka Absen Pulang Mulai Jam</label>
+            <input type="time" name="jam_pulang_mulai" required class="form-input" value="10:30">
+            <p class="text-[11px] text-gray-500 mt-1">Mulai jam ini siswa bisa absen pulang tepat waktu.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label font-semibold">Batas Akhir Penjemputan</label>
+            <input type="time" name="jam_pulang_akhir" required class="form-input" value="14:00">
+            <p class="text-[11px] text-gray-500 mt-1">Lewat jam ini ditandai <em>Telat Jemput</em>.</p>
+          </div>
         </div>
 
         <div class="form-group">
