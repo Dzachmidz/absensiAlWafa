@@ -95,8 +95,14 @@
       const response = await axios.post("/api/scan/", { uid: uid }, {
         headers: { "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value },
       });
-      renderSuccess(response.data);
-      updateStatus("Scan Success!", "success");
+      const data = response.data;
+      if (data.status === "warning" || data.status === "info") {
+        renderNotice(data);
+        updateStatus(data.mode || "Notice", "warning");
+      } else {
+        renderSuccess(data);
+        updateStatus("Scan Success!", "success");
+      }
     } catch (error) {
       if (error.response && error.response.status === 404) {
         renderUnknown(uid);
@@ -116,14 +122,13 @@
   function renderSuccess(data) {
     const dynamicContent = document.getElementById("dynamic-content");
     const now = new Date();
-    const jamStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    const jamStr = data.waktu || now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
     
     const isMasuk = data.mode.toLowerCase() === "masuk";
     const headerClass = isMasuk ? "header-success" : "header-primary";
-    const statusLabel = isMasuk ? "Hadir" : "Pulang";
+    const statusLabel = data.detail_status ? `${data.mode} (${data.detail_status})` : (isMasuk ? "Hadir" : "Pulang");
     const avatarIcon = isMasuk ? "👋" : "✨";
 
-    // DI SINI PERBAIKANNYA: Pakai teks manual "HALO!" agar tidak undefined lagi
     const html = `
       <div class="card-header ${headerClass}">
         <div class="status-badge"><span class="dot"></span>${statusLabel}</div>
@@ -146,8 +151,41 @@
 
     dynamicContent.innerHTML = html;
     
-    const pesanSuara = `Halo, selamat ${data.mode}, ${data.nama}. Kelas ${data.kelas}.`;
+    let pesanSuara = `Halo, selamat ${data.mode}, ${data.nama}.`;
+    if (data.detail_status) {
+      pesanSuara += ` Status ${data.detail_status}.`;
+    }
     speak(pesanSuara);
+  }
+
+  function renderNotice(data) {
+    const dynamicContent = document.getElementById("dynamic-content");
+    const now = new Date();
+    const jamStr = data.waktu || now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+    dynamicContent.innerHTML = `
+      <div class="card-header header-warning">
+        <div class="status-badge"><span class="dot"></span>${data.mode || 'Peringatan'}</div>
+        <h1>PERHATIAN</h1>
+      </div>
+      <div class="card-body">
+        <div class="avatar-section">
+          <div class="avatar-icon warning">⚠️</div>
+        </div>
+        <p class="greeting">Pemberitahuan</p>
+        <h2 class="student-name">${data.nama}</h2>
+        <div class="unknown-box" style="margin-top: 10px;">
+          <p class="uid-label">${data.kelas}</p>
+          <p class="uid-value" style="font-size: 0.95rem; font-family: inherit; font-weight: 500; color: #b45309;">${data.message}</p>
+        </div>
+        <div class="info-grid" style="margin-top: 15px;">
+          <div class="info-box"><span class="label">Waktu Scan</span><span class="value time">${jamStr}</span></div>
+        </div>
+      </div>
+      <div class="card-footer"><p>Absensi Digital Al-Wafa • v2.0</p></div>
+    `;
+
+    speak(data.message || `Perhatian, ${data.nama}`);
   }
 
   function renderUnknown(uid) {
