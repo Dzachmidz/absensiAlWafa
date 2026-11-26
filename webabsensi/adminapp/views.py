@@ -331,7 +331,15 @@ def kelola_sesi_view(request, kelas_id):
 
 @login_required(login_url='login')
 def data_siswa_view(request):
-    # Handle Delete
+    # Handle Bulk Delete
+    if request.method == 'POST' and request.POST.get('action') == 'bulk_delete':
+        selected_ids = request.POST.getlist('selected_ids')
+        if selected_ids:
+            deleted_count = Siswa.objects.filter(id__in=selected_ids).delete()[0]
+            messages.success(request, f"Berhasil menghapus {deleted_count} data siswa.")
+        return redirect('data_siswa')
+
+    # Handle Single Delete
     if 'delete' in request.GET:
         try:
             id_delete = request.GET.get('delete')
@@ -341,7 +349,7 @@ def data_siswa_view(request):
             messages.error(request, f"Gagal menghapus: {e}")
         return redirect('data_siswa')
 
-    if request.method == 'POST':
+    if request.method == 'POST' and not request.POST.get('action'):
         nama = request.POST.get('nama')
         nik = request.POST.get('nik')
         kelas_id = request.POST.get('kelas_id')
@@ -353,7 +361,7 @@ def data_siswa_view(request):
             if Siswa.objects.filter(nik=nik).exists():
                 messages.error(request, f"NIK/NIS {nik} sudah terdaftar!")
             else:
-                kelas_obj = Kelas.objects.get(id=kelas_id)
+                kelas_obj = Kelas.objects.get(id=kelas_id) if kelas_id else None
                 Siswa.objects.create(
                     nama=nama,
                     nik=nik,
@@ -666,19 +674,33 @@ def edit_siswa_view(request, id):
 
 @login_required(login_url='login')
 def cetak_id_card_view(request, id):
-    siswa = get_object_or_404(Siswa, id=id)
+    siswa = get_object_or_404(
+        Siswa.objects.filter(models.Q(foto__isnull=False) & ~models.Q(foto='')),
+        id=id
+    )
     return render(request, 'cetak_id_card.html', {'siswa': siswa})
 
 
 @login_required(login_url='login')
 def cetak_id_card_bulk_view(request):
-    siswa_list = Siswa.objects.select_related('kelas').all()
-    jenjang = request.GET.get('jenjang')
-    kelas_id = request.GET.get('kelas_id')
-    if jenjang:
-        siswa_list = siswa_list.filter(kelas__jenjang=jenjang)
-    if kelas_id:
-        siswa_list = siswa_list.filter(kelas_id=kelas_id)
+    siswa_list = Siswa.objects.select_related('kelas').filter(
+        models.Q(foto__isnull=False) & ~models.Q(foto='')
+    )
+    
+    # Priority 1: Specific IDs from bulk selection
+    ids = request.GET.get('ids')
+    if ids:
+        id_list = [i for i in ids.split(',') if i.isdigit()]
+        siswa_list = siswa_list.filter(id__in=id_list)
+    else:
+        # Priority 2: Current filters
+        jenjang = request.GET.get('jenjang')
+        kelas_id = request.GET.get('kelas_id')
+        if jenjang:
+            siswa_list = siswa_list.filter(kelas__jenjang=jenjang)
+        if kelas_id:
+            siswa_list = siswa_list.filter(kelas_id=kelas_id)
+            
     return render(request, 'cetak_id_card_bulk.html', {'siswa_list': siswa_list})
 
 

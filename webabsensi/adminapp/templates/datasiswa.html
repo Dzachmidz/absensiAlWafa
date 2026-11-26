@@ -52,25 +52,58 @@
 
 <!-- Table Card -->
 <div class="admin-card">
-  <div class="admin-card-header">
+  <div class="admin-card-header flex flex-wrap items-center justify-between gap-3">
     <h3><i class="fas fa-user-graduate"></i> Daftar Siswa</h3>
+    
+    <!-- Bulk Action Toolbar (Tampil saat ada checkbox terpilih) -->
+    <div id="bulk-action-bar" class="hidden flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm transition-all duration-200">
+      <span class="text-indigo-800 font-medium">
+        <span id="bulk-selected-count" class="font-bold">0</span> siswa dipilih
+      </span>
+      <div class="h-4 w-px bg-indigo-200 mx-1"></div>
+      <button type="button" id="btn-bulk-print" class="btn btn-sm btn-success flex items-center gap-1.5 py-1 px-3 text-xs">
+        <i class="fas fa-print"></i>
+        <span>Cetak ID Card Terpilih</span>
+      </button>
+      <button type="button" id="btn-bulk-delete" class="btn btn-sm btn-danger flex items-center gap-1.5 py-1 px-3 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg">
+        <i class="fas fa-trash"></i>
+        <span>Hapus Terpilih</span>
+      </button>
+      <button type="button" id="btn-bulk-clear" class="text-xs text-gray-500 hover:text-gray-700 ml-1 underline cursor-pointer">
+        Batal
+      </button>
+    </div>
   </div>
+
+  <!-- Hidden Form untuk Bulk Delete -->
+  <form id="form-bulk-delete" method="POST" action="{% url 'data_siswa' %}" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="bulk_delete">
+    <div id="bulk-delete-inputs"></div>
+  </form>
+
   <div class="admin-card-body">
     <div class="admin-table-wrapper">
       <table id="table-siswa" class="admin-table display">
         <thead>
           <tr>
+            <th class="w-10 text-center" data-orderable="false">
+              <input type="checkbox" id="check-all-page" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer" title="Pilih Semua di Halaman Ini">
+            </th>
             <th>Siswa</th>
             <th>NIK/NIS</th>
             <th>Kelas</th>
             <th>Jenjang</th>
             <th>Status RFID</th>
-            <th class="text-right">Aksi</th>
+            <th class="text-right" data-orderable="false">Aksi</th>
           </tr>
         </thead>
         <tbody>
           {% for s in data_siswa %}
-          <tr>
+          <tr data-id="{{ s.id }}">
+            <td class="text-center">
+              <input type="checkbox" class="row-checkbox w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer" value="{{ s.id }}" data-nama="{{ s.nama }}" data-has-foto="{% if s.foto %}1{% else %}0{% endif %}">
+            </td>
             <td>
               <div class="flex items-center gap-3">
                 {% if s.foto %}
@@ -112,9 +145,15 @@
             </td>
             <td class="text-right">
               <div class="flex items-center justify-end gap-2">
+                {% if s.foto %}
                 <a href="{% url 'cetak_id_card' s.id %}" target="_blank" class="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors" title="Cetak ID Card">
                   <i class="fas fa-print"></i>
                 </a>
+                {% else %}
+                <span class="p-2 text-gray-300 cursor-not-allowed rounded-lg" title="Belum upload foto (tidak dapat dicetak)">
+                  <i class="fas fa-print"></i>
+                </span>
+                {% endif %}
                 <a href="{% url 'edit_siswa' s.id %}" class="p-2 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
                   <i class="fas fa-edit"></i>
                 </a>
@@ -254,13 +293,180 @@
     }
   }
 
-  // DataTable Init
+  // DataTable Init & Selection Persistence across pagination
   $(document).ready(function() {
-    $('#table-siswa').DataTable({
+    // Set to store selected IDs across pagination
+    const selectedIds = new Set();
+    const studentsWithoutPhoto = new Set(); // ID yang terpilih tapi tidak punya foto
+
+    const table = $('#table-siswa').DataTable({
       "pageLength": 10,
+      "order": [], // Hindari sorting otomatis kolom pertama (checkbox)
+      "columnDefs": [
+        { "orderable": false, "targets": [0, 6] }
+      ],
       "language": {
         "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json"
+      },
+      "drawCallback": function(settings) {
+        // Setiap kali page berpindah / tabel di-render ulang:
+        // 1. Sinkronkan checkbox baris dengan Set selectedIds
+        let allPageChecked = true;
+        let hasRows = false;
+
+        $('#table-siswa tbody tr').each(function() {
+          const chk = $(this).find('.row-checkbox');
+          if (chk.length) {
+            hasRows = true;
+            const id = chk.val();
+            if (selectedIds.has(id)) {
+              chk.prop('checked', true);
+              $(this).addClass('bg-indigo-50/60');
+            } else {
+              chk.prop('checked', false);
+              $(this).removeClass('bg-indigo-50/60');
+              allPageChecked = false;
+            }
+          }
+        });
+
+        // 2. Sinkronkan check-all di thead untuk halaman saat ini
+        $('#check-all-page').prop('checked', hasRows && allPageChecked);
+        updateBulkBar();
       }
+    });
+
+    // Update bulk action toolbar UI
+    function updateBulkBar() {
+      const count = selectedIds.size;
+      $('#bulk-selected-count').text(count);
+      if (count > 0) {
+        $('#bulk-action-bar').removeClass('hidden');
+      } else {
+        $('#bulk-action-bar').addClass('hidden');
+      }
+    }
+
+    // Event handler: Single row checkbox change
+    $('#table-siswa tbody').on('change', '.row-checkbox', function() {
+      const id = $(this).val();
+      const hasFoto = $(this).data('has-foto') == '1';
+      const row = $(this).closest('tr');
+
+      if ($(this).is(':checked')) {
+        selectedIds.add(id);
+        if (!hasFoto) {
+          studentsWithoutPhoto.add(id);
+        }
+        row.addClass('bg-indigo-50/60');
+      } else {
+        selectedIds.delete(id);
+        studentsWithoutPhoto.delete(id);
+        row.removeClass('bg-indigo-50/60');
+      }
+
+      // Check all-page checkbox sync
+      let allChecked = true;
+      $('#table-siswa tbody .row-checkbox').each(function() {
+        if (!$(this).is(':checked')) allChecked = false;
+      });
+      $('#check-all-page').prop('checked', allChecked);
+
+      updateBulkBar();
+    });
+
+    // Event handler: Check All on current page
+    $('#check-all-page').on('change', function() {
+      const isChecked = $(this).is(':checked');
+      $('#table-siswa tbody .row-checkbox').each(function() {
+        $(this).prop('checked', isChecked);
+        const id = $(this).val();
+        const hasFoto = $(this).data('has-foto') == '1';
+        const row = $(this).closest('tr');
+
+        if (isChecked) {
+          selectedIds.add(id);
+          if (!hasFoto) studentsWithoutPhoto.add(id);
+          row.addClass('bg-indigo-50/60');
+        } else {
+          selectedIds.delete(id);
+          studentsWithoutPhoto.delete(id);
+          row.removeClass('bg-indigo-50/60');
+        }
+      });
+      updateBulkBar();
+    });
+
+    // Event handler: Clear all selections
+    $('#btn-bulk-clear').on('click', function() {
+      selectedIds.clear();
+      studentsWithoutPhoto.clear();
+      $('#check-all-page').prop('checked', false);
+      $('#table-siswa tbody .row-checkbox').prop('checked', false);
+      $('#table-siswa tbody tr').removeClass('bg-indigo-50/60');
+      updateBulkBar();
+    });
+
+    // Event handler: Bulk Print PDF
+    $('#btn-bulk-print').on('click', function() {
+      if (selectedIds.size === 0) return;
+
+      // Filter hanya siswa yang memiliki foto
+      const validPrintIds = [];
+      let skippedCount = 0;
+
+      // Kita cek seluruh data di DataTable (semua halaman)
+      table.rows().every(function() {
+        const rowNode = this.node();
+        const chk = $(rowNode).find('.row-checkbox');
+        if (chk.length) {
+          const id = chk.val();
+          if (selectedIds.has(id)) {
+            const hasFoto = chk.data('has-foto') == '1';
+            if (hasFoto) {
+              validPrintIds.push(id);
+            } else {
+              skippedCount++;
+            }
+          }
+        }
+      });
+
+      if (validPrintIds.length === 0) {
+        alert('Tidak ada siswa terpilih yang memiliki foto. Siswa tanpa foto tidak dapat dicetak ID card-nya.');
+        return;
+      }
+
+      if (skippedCount > 0) {
+        const proceed = confirm(
+          skippedCount + ' siswa yang dipilih belum memiliki foto dan akan otomatis dilewati.\n' +
+          'Lanjutkan mencetak ' + validPrintIds.length + ' siswa yang memiliki foto?'
+        );
+        if (!proceed) return;
+      }
+
+      const printUrl = "{% url 'cetak_id_card_bulk' %}?ids=" + validPrintIds.join(',');
+      window.open(printUrl, '_blank');
+    });
+
+    // Event handler: Bulk Delete
+    $('#btn-bulk-delete').on('click', function() {
+      const count = selectedIds.size;
+      if (count === 0) return;
+
+      if (!confirm(`Apakah Anda yakin ingin menghapus ${count} data siswa yang dipilih? Tindakan ini tidak dapat dibatalkan.`)) {
+        return;
+      }
+
+      const form = $('#form-bulk-delete');
+      const inputsContainer = $('#bulk-delete-inputs');
+      inputsContainer.empty();
+
+      selectedIds.forEach(id => {
+        inputsContainer.append(`<input type="hidden" name="selected_ids" value="${id}">`);
+      });
+
+      form.submit();
     });
   });
 
